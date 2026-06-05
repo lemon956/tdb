@@ -16,6 +16,8 @@ type connectionFormField struct {
 	Value    string
 	Secret   bool
 	Required bool
+	// Cursor is the byte offset of the editing caret within Value.
+	Cursor int
 }
 
 type connectionForm struct {
@@ -114,21 +116,72 @@ func (f *connectionForm) insert(text string) {
 	if !ok {
 		return
 	}
-	field.Value += sanitizeSingleLineInput(text)
+	text = sanitizeSingleLineInput(text)
+	if text == "" {
+		return
+	}
+	c := clamp(field.Cursor, 0, len(field.Value))
+	field.Value = field.Value[:c] + text + field.Value[c:]
+	field.Cursor = c + len(text)
 }
 
 func (f *connectionForm) backspace() {
 	field, ok := f.currentField()
-	if !ok || field.Value == "" {
+	if !ok {
 		return
 	}
-	field.Value = field.Value[:len(field.Value)-1]
+	c := clamp(field.Cursor, 0, len(field.Value))
+	if c == 0 {
+		return
+	}
+	prev := queryCursorLeft(field.Value, c)
+	field.Value = field.Value[:prev] + field.Value[c:]
+	field.Cursor = prev
+}
+
+func (f *connectionForm) deleteForward() {
+	field, ok := f.currentField()
+	if !ok {
+		return
+	}
+	c := clamp(field.Cursor, 0, len(field.Value))
+	if c >= len(field.Value) {
+		return
+	}
+	next := queryCursorRight(field.Value, c)
+	field.Value = field.Value[:c] + field.Value[next:]
+	field.Cursor = c
+}
+
+func (f *connectionForm) moveCursorLeft() {
+	if field, ok := f.currentField(); ok {
+		field.Cursor = queryCursorLeft(field.Value, clamp(field.Cursor, 0, len(field.Value)))
+	}
+}
+
+func (f *connectionForm) moveCursorRight() {
+	if field, ok := f.currentField(); ok {
+		field.Cursor = queryCursorRight(field.Value, clamp(field.Cursor, 0, len(field.Value)))
+	}
+}
+
+func (f *connectionForm) cursorHome() {
+	if field, ok := f.currentField(); ok {
+		field.Cursor = 0
+	}
+}
+
+func (f *connectionForm) cursorEnd() {
+	if field, ok := f.currentField(); ok {
+		field.Cursor = len(field.Value)
+	}
 }
 
 func (f *connectionForm) setFieldValue(name, value string) bool {
 	for i := range f.fields {
 		if f.fields[i].Name == name {
 			f.fields[i].Value = value
+			f.fields[i].Cursor = len(value)
 			return true
 		}
 	}

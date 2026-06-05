@@ -12,6 +12,7 @@ type ObjectType string
 
 const (
 	ObjectTable      ObjectType = "table"
+	ObjectView       ObjectType = "view"
 	ObjectCollection ObjectType = "collection"
 	ObjectKey        ObjectType = "key"
 )
@@ -19,6 +20,9 @@ const (
 type Object struct {
 	Name string     `json:"name"`
 	Type ObjectType `json:"type"`
+	// SubType carries a finer data type when Type alone is not enough, e.g. the
+	// redis key data type (string/list/set/hash/zset/stream).
+	SubType string `json:"sub_type,omitempty"`
 }
 
 type MetadataField struct {

@@ -8,31 +8,33 @@ import (
 // Semantic palette — the single source of truth for colors. Everything else in
 // the app derives from these named colors rather than ad-hoc hex literals.
 const (
-	colBg          = "#0B1220" // base panel background
-	colBgAlt       = "#0F1A2E" // alternate row tint
-	colInk         = "#D7DEE9" // default foreground
-	colInkBright   = "#F8FAFC" // bright/emphasis foreground
-	colInkInverse  = "#0F172A" // foreground on bright backgrounds
-	colBorder      = "#334155" // idle panel border
-	colMuted       = "#94A3B8" // dimmed text / placeholders
-	colAccent      = "#38BDF8" // primary accent (cyan-blue)
-	colInfo        = "#60A5FA"
-	colSuccess     = "#4ADE80"
-	colWarning     = "#FBBF24"
-	colDanger      = "#F87171"
-	colDangerLine  = "#EF4444"
-	colViolet      = "#A78BFA"
-	colHeaderBg    = "#1D4ED8"
-	colStatusBg    = "#111827"
-	colFooterBg    = "#1E293B"
-	colSelectBg    = "#67E8F9" // selected row / cursor-in-list
-	colCursorBg    = "#14532D" // blinking character cursor
-	colVisualBg    = "#2563EB" // visual selection
-	colKey         = "#FDE68A" // keyboard hints
-	colSidebarBg   = "#0A1F2E"
-	colSidebarEdge = "#0E7490"
-	colMainBg      = "#0B1F16"
-	colMainEdge    = "#166534"
+	colBg               = "#0B1220" // base panel background
+	colBgAlt            = "#0F1A2E" // alternate row tint
+	colInk              = "#D7DEE9" // default foreground
+	colInkBright        = "#F8FAFC" // bright/emphasis foreground
+	colInkInverse       = "#0F172A" // foreground on bright backgrounds
+	colBorder           = "#334155" // idle panel border
+	colMuted            = "#94A3B8" // dimmed text / placeholders
+	colAccent           = "#38BDF8" // primary accent (cyan-blue)
+	colInfo             = "#60A5FA"
+	colSuccess          = "#4ADE80"
+	colWarning          = "#FBBF24"
+	colDanger           = "#F87171"
+	colDangerLine       = "#EF4444"
+	colViolet           = "#A78BFA"
+	colHeaderBg         = "#1D4ED8"
+	colStatusBg         = "#111827"
+	colFooterBg         = "#1E293B"
+	colCursor           = "#22D3EE" // unified cursor / selection highlight (bright cyan)
+	colCursorDim        = "#0E7490" // dimmed selection (unfocused panel)
+	colSelectBg         = colCursor // selected row / cursor-in-list
+	colCursorBg         = colCursor // blinking character cursor
+	colVisualBg         = colCursor // visual selection
+	colKey              = "#FDE68A" // keyboard hints
+	colSidebarBg        = "#0A1F2E"
+	colSidebarEdge      = "#0E7490"
+	colMainBg           = "#0B1F16"
+	colMainEdge         = "#166534"
 	colSidebarFocusBg   = "#083344"
 	colSidebarFocusEdge = "#22D3EE"
 	colMainFocusBg      = "#052E16"
@@ -40,32 +42,33 @@ const (
 	colQueryInputBg     = "#0F2A1C"
 	colTabQuery         = "#FDE68A"
 	colTabData          = "#A7F3D0"
-	colTabActiveBg      = "#FDE047"
+	colTabActiveBg      = colCursor
 	colModalBg          = "#111827"
 	colHistoryBg        = "#241F36"
 )
 
 type appTheme struct {
-	header     lipgloss.Style
-	status     lipgloss.Style
-	panel      lipgloss.Style
-	sidebar    lipgloss.Style
-	main       lipgloss.Style
-	context    lipgloss.Style
-	focused    lipgloss.Style
-	panelTitle lipgloss.Style
-	muted      lipgloss.Style
-	accent     lipgloss.Style
-	danger     lipgloss.Style
-	footer     lipgloss.Style
-	command    lipgloss.Style
-	selected   lipgloss.Style
-	cursor     lipgloss.Style
-	visual     lipgloss.Style
-	key        lipgloss.Style
-	queryInput lipgloss.Style
-	resultBar  lipgloss.Style
-	tableHead  lipgloss.Style
+	header      lipgloss.Style
+	status      lipgloss.Style
+	panel       lipgloss.Style
+	sidebar     lipgloss.Style
+	main        lipgloss.Style
+	context     lipgloss.Style
+	focused     lipgloss.Style
+	panelTitle  lipgloss.Style
+	muted       lipgloss.Style
+	accent      lipgloss.Style
+	danger      lipgloss.Style
+	footer      lipgloss.Style
+	command     lipgloss.Style
+	selected    lipgloss.Style
+	selectedDim lipgloss.Style
+	cursor      lipgloss.Style
+	visual      lipgloss.Style
+	key         lipgloss.Style
+	queryInput  lipgloss.Style
+	resultBar   lipgloss.Style
+	tableHead   lipgloss.Style
 
 	// Restyle additions.
 	sectionTitle lipgloss.Style // modal / help group titles
@@ -141,12 +144,16 @@ func defaultTheme() appTheme {
 			Bold(true).
 			Foreground(lipgloss.Color(colInkInverse)).
 			Background(lipgloss.Color(colSelectBg)),
+		selectedDim: lipgloss.NewStyle().
+			Foreground(lipgloss.Color(colInkBright)).
+			Background(lipgloss.Color(colCursorDim)),
 		cursor: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color(colInkBright)).
+			Foreground(lipgloss.Color(colInkInverse)).
 			Background(lipgloss.Color(colCursorBg)),
 		visual: lipgloss.NewStyle().
-			Foreground(lipgloss.Color(colInkBright)).
+			Bold(true).
+			Foreground(lipgloss.Color(colInkInverse)).
 			Background(lipgloss.Color(colVisualBg)),
 		key:        lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(colKey)),
 		queryInput: lipgloss.NewStyle().Foreground(lipgloss.Color("#E2E8F0")).Background(lipgloss.Color(colQueryInputBg)),

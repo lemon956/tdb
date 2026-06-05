@@ -2,10 +2,13 @@ package app
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
+
+	"tdb/internal/config"
 )
 
 type Focus string
@@ -312,7 +315,13 @@ func (m *Model) mainContent() string {
 	case PageUnlock:
 		theme := defaultTheme()
 		b.WriteString(theme.sectionTitle.Render("Unlock config") + "\n")
-		b.WriteString("Password: " + strings.Repeat("*", len(m.input.Value())) + "\n")
+		if m.unlockCommand {
+			b.WriteString("Command: " + m.input.Value() + m.renderCursorCell(" ") + "\n")
+			b.WriteString(theme.muted.Render("Only :q is available before unlocking. Esc to go back.") + "\n")
+		} else {
+			b.WriteString("Password: " + strings.Repeat("*", len(m.input.Value())) + m.renderCursorCell(" ") + "\n")
+			b.WriteString(theme.muted.Render("Press : then type q to quit.") + "\n")
+		}
 	case PageConnections:
 		b.WriteString(m.connectionWorkspaceContent())
 	case PageBrowser:
@@ -473,11 +482,13 @@ func (m *Model) connectionFormContent() string {
 	}
 	b.WriteString("Driver: " + string(m.form.driver) + "\n")
 	for i, field := range m.form.fields {
-		marker := "  "
 		if i == m.form.fieldIndex {
-			marker = "> "
+			// Active field: show an inline input cursor at the editing position so
+			// it is obvious which field is being edited and where the caret is.
+			b.WriteString("> " + field.Label + ": " + m.renderFormFieldValue(field, true) + "\n")
+			continue
 		}
-		b.WriteString(marker + field.Label + ": " + displayFieldValue(field) + "\n")
+		b.WriteString("  " + field.Label + ": " + m.renderFormFieldValue(field, false) + "\n")
 	}
 	readonly := "[ ] Readonly"
 	if m.form.readOnly {
@@ -501,11 +512,12 @@ func (m *Model) helpPanelContent() string {
 		{"Global", []string{
 			"?: open searchable help",
 			":: open global command line",
+			":q: quit the program (the only way to exit)",
 			"Tab: switch Navigation and Workspace only",
 			"help: open searchable help",
 			"history: current connection history",
 			"query: create a query tab",
-			"q or Esc: back / close",
+			"q or Esc: back / close (does not quit)",
 		}},
 		{"Navigation", []string{
 			"j/k or Up/Down: move selection",
@@ -596,6 +608,28 @@ func displayFieldValue(field connectionFormField) string {
 	return field.Value
 }
 
+// renderFormFieldValue renders a form field's value, masking secrets per-rune and
+// (when active) drawing the editing caret at the cursor position.
+func (m *Model) renderFormFieldValue(field connectionFormField, active bool) string {
+	cursor := clamp(field.Cursor, 0, len(field.Value))
+	var b strings.Builder
+	for pos, r := range field.Value {
+		ch := string(r)
+		if field.Secret {
+			ch = "*"
+		}
+		if active && pos == cursor {
+			b.WriteString(m.renderCursorCell(ch))
+		} else {
+			b.WriteString(ch)
+		}
+	}
+	if active && cursor == len(field.Value) {
+		b.WriteString(m.renderCursorCell(" "))
+	}
+	return b.String()
+}
+
 func (m *Model) connectionFormHitboxes(contextX, contextWidth int) HitboxRegistry {
 	x := contextX + 2
 	width := max(8, contextWidth-4)
@@ -636,16 +670,70 @@ func (m *Model) connectionFormHitboxes(contextX, contextWidth int) HitboxRegistr
 	return boxes
 }
 
+// renderConnectionRow renders one connection uniformly for both the connections
+// list and the navigation tree root: a brand-colored driver ICON followed by
+// plain (uncolored) id/endpoint/lock text. Only the icon carries the brand color
+// so the row text stays readable, including on the selection highlight. prefix is
+// placed before the icon (the tree chevron for the nav root, "" for the list).
+func (m *Model) renderConnectionRow(profile config.Profile, prefix string, width int, selected, focused bool) string {
+	theme := defaultTheme()
+	glyph, color := m.icons.DriverIcon(profile.Driver)
+	indicator := glyph
+	if indicator == "" {
+		indicator = string(profile.Driver) // no brand glyph in this style → name
+	}
+	text := profile.ID
+	if ep := connectionEndpoint(profile); ep != "" {
+		text += " " + ep
+	}
+	if profile.ReadOnly {
+		text += " " + m.icons.Lock
+	}
+
+	if selected {
+		body := "> " + prefix + indicator + " " + text
+		if width > 0 {
+			body = padCells(body, width)
+		}
+		if focused {
+			return theme.selected.Render(body)
+		}
+		return theme.selectedDim.Render(body)
+	}
+
+	lead := indicator
+	if glyph != "" && color != "" {
+		lead = lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render(glyph)
+	}
+	line := "  " + prefix + lead + " " + text
+	if width > 0 {
+		line = padCells(line, width)
+	}
+	return line
+}
+
+// connectionEndpoint returns a uniform "host:port" endpoint for a profile so every
+// connection row reads the same way (mongo's host comes from its URI instead of
+// the empty host:port that produced the inconsistent ":0").
+func connectionEndpoint(profile config.Profile) string {
+	if profile.Host != "" {
+		return fmt.Sprintf("%s:%d", profile.Host, profile.Port)
+	}
+	if profile.URIParams != "" {
+		if u, err := url.Parse(profile.URIParams); err == nil && u.Host != "" {
+			return u.Host
+		}
+	}
+	return ""
+}
+
 func (m *Model) connectionsList() string {
 	if len(m.vault.Profiles) == 0 {
 		return defaultTheme().muted.Render("no saved profiles")
 	}
 	var b strings.Builder
-	theme := defaultTheme()
 	for i, profile := range m.vault.Profiles {
-		line := fmt.Sprintf("%s [%s] %s:%d", profile.ID, profile.Driver, profile.Host, profile.Port)
-		line = sidebarCursorLine(theme, line, i == m.connectionIndex, m.focus == FocusSidebar)
-		b.WriteString(line + "\n")
+		b.WriteString(m.renderConnectionRow(profile, "", 0, i == m.connectionIndex, m.focus == FocusSidebar) + "\n")
 	}
 	return b.String()
 }
@@ -690,13 +778,21 @@ func (m *Model) renderBrowserNodes(nodes []navNode, offset, width int, verticalS
 		thumb = clamp(m.browserCursor-offset, 0, len(nodes)-1)
 	}
 	for i, node := range nodes {
-		line := strings.Repeat("  ", node.Depth) + node.Label
-		if width > 0 {
-			line = cellSlice(line, m.navHorizontalOffset, width)
-			line = padCells(line, width)
-		}
 		selected := offset+i == m.browserCursor
-		line = sidebarCursorLine(theme, line, selected, m.focus == FocusSidebar)
+		var line string
+		if node.Kind == navNodeConnection && m.activeProfile != nil {
+			// The connection root is rendered with the shared connection row so the
+			// nav tree and the connections list look identical (colored icon, plain
+			// text). The chevron is the prefix; selection is handled inside.
+			line = m.renderConnectionRow(*m.activeProfile, m.icons.Expanded+" ", width, selected, m.focus == FocusSidebar)
+		} else {
+			line = strings.Repeat("  ", node.Depth) + node.Label
+			if width > 0 {
+				line = cellSlice(line, m.navHorizontalOffset, width)
+				line = padCells(line, width)
+			}
+			line = sidebarCursorLine(theme, line, selected, m.focus == FocusSidebar)
+		}
 		if verticalScrollbar {
 			bar := "│"
 			if i == thumb {
@@ -786,7 +882,9 @@ func sidebarCursorLine(theme appTheme, line string, selected, focused bool) stri
 	if focused {
 		return theme.selected.Render("> " + line)
 	}
-	return theme.muted.Render("  " + line)
+	// Keep the cursor position visible even when the panel is not focused, just
+	// dimmer than the focused highlight.
+	return theme.selectedDim.Render("> " + line)
 }
 
 type footerAction struct {
@@ -865,7 +963,7 @@ func (m *Model) footerHints(theme appTheme) string {
 	}
 	switch m.page {
 	case PageUnlock:
-		return hint([2]string{"enter", "unlock"}, [2]string{"^c", "quit"})
+		return hint([2]string{"enter", "unlock"}, [2]string{":q", "quit"})
 	case PageConnections:
 		return hint([2]string{"↑↓", "select"}, [2]string{"enter", "open"}, [2]string{"n", "new"}, [2]string{"e", "edit"}, [2]string{"d", "delete"}, [2]string{"t", "test"}, [2]string{":", "cmd"}, [2]string{"?", "help"})
 	}
@@ -885,7 +983,7 @@ func (m *Model) footerHints(theme appTheme) string {
 		}
 		return hint([2]string{"hjkl", "move"}, [2]string{"v", "select"}, [2]string{"y", "copy"}, [2]string{"tab", "nav"}, [2]string{"?", "help"})
 	}
-	return hint([2]string{"tab", "switch"}, [2]string{":", "cmd"}, [2]string{"?", "help"}, [2]string{"^c", "quit"})
+	return hint([2]string{"tab", "switch"}, [2]string{":", "cmd"}, [2]string{"?", "help"}, [2]string{":q", "quit"})
 }
 
 func commandSuggestionHeight(m *Model) int {
@@ -911,14 +1009,16 @@ func renderCommandSuggestions(theme appTheme, m *Model, width int) string {
 		limit = 5
 	}
 	for idx := 0; idx < limit; idx++ {
+		selected := idx == m.input.SelectedIndex()
 		marker := " "
-		if idx == m.input.SelectedIndex() {
+		if selected {
 			marker = ">"
 		}
-		b.WriteString(marker + " " + suggestions[idx].Label)
+		row := marker + " " + suggestions[idx].Label
 		if suggestions[idx].Detail != "" {
-			b.WriteString(" - " + suggestions[idx].Detail)
+			row += " - " + suggestions[idx].Detail
 		}
+		b.WriteString(selectedRow(theme, row, selected))
 		if idx < limit-1 {
 			b.WriteString("\n")
 		}

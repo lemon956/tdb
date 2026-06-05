@@ -3,7 +3,9 @@ package app
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -161,6 +163,126 @@ func TestConnectionFormKeyboardCreatesMongoProfile(t *testing.T) {
 	}
 	if profile.URIParams != "mongodb://user:secret@127.0.0.1:27017/app?authSource=admin" || profile.Database != "app" {
 		t.Fatalf("profile = %+v", profile)
+	}
+}
+
+func newFieldEditModel(t *testing.T) *Model {
+	t.Helper()
+	model := newWorkspaceTabModel(t)
+	model.form = newConnectionForm()
+	model.form.chooseDriver(config.DriverMySQL)
+	model.form.fieldIndex = 0 // "ID" text field
+	return model
+}
+
+func fieldKey(s string) tea.KeyMsg {
+	switch s {
+	case "left":
+		return tea.KeyMsg{Type: tea.KeyLeft}
+	case "right":
+		return tea.KeyMsg{Type: tea.KeyRight}
+	case "home":
+		return tea.KeyMsg{Type: tea.KeyHome}
+	case "end":
+		return tea.KeyMsg{Type: tea.KeyEnd}
+	case "backspace":
+		return tea.KeyMsg{Type: tea.KeyBackspace}
+	case "delete":
+		return tea.KeyMsg{Type: tea.KeyDelete}
+	default:
+		return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)}
+	}
+}
+
+func typeInto(m *Model, keys ...string) {
+	for _, k := range keys {
+		m.handleConnectionFieldKey(context.Background(), fieldKey(k))
+	}
+}
+
+func activeFormField(m *Model) connectionFormField {
+	f, _ := m.form.currentField()
+	return *f
+}
+
+func TestConnectionFieldInsertsAtCursor(t *testing.T) {
+	m := newFieldEditModel(t)
+	typeInto(m, "a", "b", "c")  // "abc", cursor at end
+	typeInto(m, "left", "left") // cursor between a|bc
+	typeInto(m, "X")            // "aXbc"
+	if got := activeFormField(m).Value; got != "aXbc" {
+		t.Fatalf("Value = %q, want aXbc", got)
+	}
+}
+
+func TestConnectionFieldBackspaceAndDeleteAtCursor(t *testing.T) {
+	m := newFieldEditModel(t)
+	typeInto(m, "a", "b", "c", "d") // abcd
+	typeInto(m, "left")             // abc|d
+	typeInto(m, "backspace")        // ab|d (deletes char before cursor)
+	if got := activeFormField(m).Value; got != "abd" {
+		t.Fatalf("after backspace Value = %q, want abd", got)
+	}
+	typeInto(m, "delete") // ab| (deletes char at cursor: 'd')
+	if got := activeFormField(m).Value; got != "ab" {
+		t.Fatalf("after delete Value = %q, want ab", got)
+	}
+}
+
+func TestConnectionFieldHomeEnd(t *testing.T) {
+	m := newFieldEditModel(t)
+	typeInto(m, "h", "i")
+	typeInto(m, "home", "Z") // Zhi
+	if got := activeFormField(m).Value; got != "Zhi" {
+		t.Fatalf("after home insert Value = %q, want Zhi", got)
+	}
+	typeInto(m, "end", "!") // Zhi!
+	if got := activeFormField(m).Value; got != "Zhi!" {
+		t.Fatalf("after end insert Value = %q, want Zhi!", got)
+	}
+}
+
+func TestConnectionFieldCJKCursorRuneSafe(t *testing.T) {
+	m := newFieldEditModel(t)
+	typeInto(m, "真", "人") // 6 bytes
+	field := activeFormField(m)
+	if field.Cursor != len(field.Value) {
+		t.Fatalf("cursor should be at end, got %d/%d", field.Cursor, len(field.Value))
+	}
+	typeInto(m, "left") // land on rune boundary before 人
+	field = activeFormField(m)
+	if field.Cursor != len("真") || !utf8.RuneStart(field.Value[field.Cursor]) {
+		t.Fatalf("cursor %d not on a rune boundary", field.Cursor)
+	}
+	typeInto(m, "backspace") // delete 真 wholly
+	if got := activeFormField(m).Value; got != "人" {
+		t.Fatalf("CJK backspace Value = %q, want 人", got)
+	}
+}
+
+func TestConnectionFieldCursorPreservedPerField(t *testing.T) {
+	m := newFieldEditModel(t)
+	typeInto(m, "a", "b", "c", "home") // field 0 cursor at 0
+	m.form.moveField(1)                // next field
+	typeInto(m, "x", "y")              // field 1 = "xy"
+	m.form.moveField(-1)               // back to field 0
+	if got := activeFormField(m).Cursor; got != 0 {
+		t.Fatalf("field 0 cursor not preserved, got %d want 0", got)
+	}
+	typeInto(m, "Z") // insert at preserved home position
+	if got := activeFormField(m).Value; got != "Zabc" {
+		t.Fatalf("Value = %q, want Zabc", got)
+	}
+}
+
+func TestConnectionFormRendersCaretAtCursor(t *testing.T) {
+	m := newFieldEditModel(t)
+	m.cursorBlinkOn = true
+	typeInto(m, "a", "b", "left") // a|b
+	content := m.connectionFormContent()
+	// Caret drawn on 'b' (the char at the cursor), not appended at the end.
+	if !strings.Contains(content, m.renderCursorCell("b")) {
+		t.Fatalf("caret should highlight the char at the cursor:\n%s", stripANSI(content))
 	}
 }
 

@@ -39,7 +39,7 @@ type navNode struct {
 }
 
 func (m *Model) ensureNavigationState() {
-	if m.icons.Connection == "" {
+	if m.icons.Database == "" {
 		m.icons = IconSetForStyle(IconStyleUnicode)
 	}
 	if m.databaseObjects == nil {
@@ -65,10 +65,24 @@ func (m *Model) browserNodes() []navNode {
 	objectCount := 0
 	dbDepth := 0
 	if m.activeProfile != nil {
+		// The connection root is rendered by renderConnectionRow; Label here is a
+		// plain mirror used only for width/search calculations.
+		icon, _ := m.icons.DriverIcon(m.activeProfile.Driver)
+		indicator := icon
+		if indicator == "" {
+			indicator = string(m.activeProfile.Driver)
+		}
+		label := m.icons.Expanded + " " + indicator + " " + m.activeProfile.ID
+		if ep := connectionEndpoint(*m.activeProfile); ep != "" {
+			label += " " + ep
+		}
+		if m.activeProfile.ReadOnly {
+			label += " " + m.icons.Lock
+		}
 		nodes = append(nodes, navNode{
 			ID:    "connection:0",
 			Kind:  navNodeConnection,
-			Label: fmt.Sprintf("%s %s %s [%s]", m.icons.Expanded, m.icons.Connection, m.activeProfile.ID, m.activeProfile.Driver),
+			Label: label,
 			Depth: 0,
 		})
 		dbDepth = 1
@@ -79,7 +93,7 @@ func (m *Model) browserNodes() []navNode {
 			nodes = append(nodes, navNode{
 				ID:        fmt.Sprintf("object:%d", objectIndex),
 				Kind:      navNodeObject,
-				Label:     fmt.Sprintf("%s %s [%s]", m.icons.Collection, object.Name, object.Type),
+				Label:     m.objectNodeLabel(object),
 				Database:  m.selectedDB,
 				Object:    object,
 				Target:    target,
@@ -112,7 +126,7 @@ func (m *Model) browserNodes() []navNode {
 			nodes = append(nodes, navNode{
 				ID:          fmt.Sprintf("object:%d", objectCount),
 				Kind:        navNodeObject,
-				Label:       fmt.Sprintf("%s %s [%s]", m.icons.Collection, object.Name, object.Type),
+				Label:       m.objectNodeLabel(object),
 				Database:    database,
 				Object:      object,
 				Target:      target,
@@ -129,6 +143,16 @@ func (m *Model) browserNodes() []navNode {
 		}
 	}
 	return nodes
+}
+
+// objectNodeLabel renders an object's nav label as "<type-icon> <name>", with a
+// trailing "(subtype)" only for redis keys (whose icon alone is cryptic).
+func (m *Model) objectNodeLabel(object db.Object) string {
+	label := m.icons.ObjectIcon(object) + " " + object.Name
+	if object.Type == db.ObjectKey && object.SubType != "" {
+		label += " (" + object.SubType + ")"
+	}
+	return label
 }
 
 func (m *Model) filterBrowserNodes(nodes []navNode) []navNode {

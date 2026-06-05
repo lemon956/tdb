@@ -117,7 +117,7 @@ func (a *Adapter) ListObjects(ctx context.Context, scope db.Scope) ([]db.Object,
 		}
 		objectType := db.ObjectTable
 		if typeIdx >= 0 && strings.EqualFold(values[typeIdx].String, "VIEW") {
-			objectType = db.ObjectType("view")
+			objectType = db.ObjectView
 		}
 		objects = append(objects, db.Object{Name: values[0].String, Type: objectType})
 	}

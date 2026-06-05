@@ -107,11 +107,42 @@ func (a *Adapter) ListObjects(ctx context.Context, _ db.Scope) ([]db.Object, err
 	if err != nil {
 		return nil, err
 	}
+	types, err := a.KeyTypes(ctx, scan.Keys)
+	if err != nil {
+		return nil, err
+	}
 	objects := make([]db.Object, 0, len(scan.Keys))
-	for _, key := range scan.Keys {
-		objects = append(objects, db.Object{Name: key, Type: db.ObjectKey})
+	for i, key := range scan.Keys {
+		objects = append(objects, db.Object{Name: key, Type: db.ObjectKey, SubType: types[i]})
 	}
 	return objects, nil
+}
+
+// KeyTypes returns the redis data type (string/list/set/hash/zset/stream) for
+// each key, fetched in a single pipelined round-trip. The result is index-aligned
+// with keys; a failed TYPE yields an empty string for that key.
+func (a *Adapter) KeyTypes(ctx context.Context, keys []string) ([]string, error) {
+	if a.client == nil {
+		return nil, ErrNoClient
+	}
+	types := make([]string, len(keys))
+	if len(keys) == 0 {
+		return types, nil
+	}
+	pipe := a.client.Pipeline()
+	cmds := make([]*redis.StatusCmd, len(keys))
+	for i, key := range keys {
+		cmds[i] = pipe.Type(ctx, key)
+	}
+	if _, err := pipe.Exec(ctx); err != nil && !errors.Is(err, redis.Nil) {
+		return nil, err
+	}
+	for i, cmd := range cmds {
+		if t, err := cmd.Result(); err == nil && t != "none" {
+			types[i] = t
+		}
+	}
+	return types, nil
 }
 
 func (a *Adapter) Preview(ctx context.Context, target db.Target, query db.Query, page db.Page) (result.Set, error) {

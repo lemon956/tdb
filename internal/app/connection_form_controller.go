@@ -75,6 +75,16 @@ func (m *Model) handleConnectionFieldKey(ctx context.Context, msg tea.KeyMsg) {
 			return
 		}
 		m.form.fieldIndex++
+	case "left":
+		m.form.moveCursorLeft()
+	case "right":
+		m.form.moveCursorRight()
+	case "home", "ctrl+a":
+		m.form.cursorHome()
+	case "end", "ctrl+e":
+		m.form.cursorEnd()
+	case "delete":
+		m.form.deleteForward()
 	case "backspace", "ctrl+h":
 		m.form.backspace()
 	case " ":

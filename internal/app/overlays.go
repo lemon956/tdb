@@ -91,8 +91,18 @@ func (m *Model) filteredDatabases() []string {
 	return filtered
 }
 
+// selectedRow applies the unified selection highlight to the current list row so
+// every movable-selection surface shows where the cursor is.
+func selectedRow(theme appTheme, text string, selected bool) string {
+	if selected {
+		return theme.selected.Render(text)
+	}
+	return text
+}
+
 func (m *Model) databasePickerContent() string {
 	var b strings.Builder
+	theme := defaultTheme()
 	b.WriteString("Search: " + m.input.Value() + m.renderCursorCell(" ") + "\n")
 	names := m.filteredDatabases()
 	if len(names) == 0 {
@@ -107,15 +117,16 @@ func (m *Model) databasePickerContent() string {
 	current := m.workspaceDatabaseName()
 	m.historyIndex = clamp(m.historyIndex, 0, len(names)-1)
 	for i, name := range names {
+		selected := i == m.historyIndex
 		marker := " "
-		if i == m.historyIndex {
+		if selected {
 			marker = ">"
 		}
 		active := "  "
 		if name == current {
 			active = "● "
 		}
-		b.WriteString(fmt.Sprintf("%s %s%s\n", marker, active, name))
+		b.WriteString(selectedRow(theme, fmt.Sprintf("%s %s%s", marker, active, name), selected) + "\n")
 	}
 	b.WriteString("\n[ Close ]")
 	return b.String()
@@ -516,14 +527,17 @@ func (m *Model) historyModalContent() string {
 		b.WriteString("\n[ Close ]")
 		return b.String()
 	}
+	theme := defaultTheme()
 	for i, entry := range entries {
+		selected := i == m.historyIndex
 		marker := " "
-		if i == m.historyIndex {
+		if selected {
 			marker = ">"
 		}
-		b.WriteString(fmt.Sprintf("%s [%s] %s %s (%dms)\n", marker, entry.Status, entry.Action, flattenStatement(entry.Statement), entry.DurationMillis))
+		row := fmt.Sprintf("%s [%s] %s %s (%dms)", marker, entry.Status, entry.Action, flattenStatement(entry.Statement), entry.DurationMillis)
+		b.WriteString(selectedRow(theme, row, selected) + "\n")
 		if entry.Error != "" {
-			b.WriteString(defaultTheme().statusErr.Render("  error: "+flattenStatement(entry.Error)) + "\n")
+			b.WriteString(theme.statusErr.Render("  error: "+flattenStatement(entry.Error)) + "\n")
 		}
 	}
 	b.WriteString("\n[ Close ]")
@@ -569,10 +583,12 @@ func (m *Model) queryHistorySearchContent() string {
 		b.WriteString("\n[ Close ]")
 		return b.String()
 	}
+	theme := defaultTheme()
 	m.historyIndex = clamp(m.historyIndex, 0, len(entries)-1)
 	for i, entry := range entries {
+		selected := i == m.historyIndex
 		marker := " "
-		if i == m.historyIndex {
+		if selected {
 			marker = ">"
 		}
 		database := entry.Database
@@ -583,7 +599,8 @@ func (m *Model) queryHistorySearchContent() string {
 		if hits < 1 {
 			hits = 1
 		}
-		b.WriteString(fmt.Sprintf("%s [%s] %s  ×%d  %s\n", marker, database, entry.Driver, hits, flattenStatement(entry.Statement)))
+		row := fmt.Sprintf("%s [%s] %s  ×%d  %s", marker, database, entry.Driver, hits, flattenStatement(entry.Statement))
+		b.WriteString(selectedRow(theme, row, selected) + "\n")
 	}
 	b.WriteString("\n[ Close ]")
 	return b.String()

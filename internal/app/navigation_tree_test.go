@@ -49,14 +49,14 @@ func TestNavigationEnterTogglesDatabaseTree(t *testing.T) {
 	if !strings.Contains(list, "▾ ◆ app") {
 		t.Fatalf("browser list = %q, want expanded database marker", list)
 	}
-	if !strings.Contains(list, "    ◇ users [table]") {
-		t.Fatalf("browser list = %q, want child object under expanded database", list)
+	if !strings.Contains(list, "    ▦ users") || strings.Contains(list, "[table]") {
+		t.Fatalf("browser list = %q, want child object with table icon and no [type] text", list)
 	}
 
 	updated, _ = got.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	got = updated.(*Model)
 	list = got.browserList()
-	if !strings.Contains(list, "▸ ◆ app") || strings.Contains(list, "users [table]") {
+	if !strings.Contains(list, "▸ ◆ app") || strings.Contains(list, "▦ users") {
 		t.Fatalf("browser list after collapse = %q, want collapsed database without object", list)
 	}
 }
@@ -219,14 +219,128 @@ func TestNavigationRendersConnectionDatabaseAndCollectionIcons(t *testing.T) {
 
 	got := stripANSI(model.browserList())
 
-	if !strings.Contains(got, "🔌 mongo-prod") {
-		t.Fatalf("navigation missing connection icon:\n%s", got)
+	// Unicode style has no brand glyph for mongo → driver shown as text, no [driver].
+	if !strings.Contains(got, "mongo mongo-prod") || strings.Contains(got, "[mongo]") {
+		t.Fatalf("connection should show driver text without brackets:\n%s", got)
 	}
 	if !strings.Contains(got, "  ▾ ◆ app") {
 		t.Fatalf("navigation missing database icon or two-space indent:\n%s", got)
 	}
-	if !strings.Contains(got, "    ◇ users [collection]") {
-		t.Fatalf("navigation missing collection icon or four-space indent:\n%s", got)
+	if !strings.Contains(got, "    ◇ users") || strings.Contains(got, "[collection]") {
+		t.Fatalf("collection should show icon with no [type] text:\n%s", got)
+	}
+}
+
+func TestNavigationConnectionShowsReadOnlyLockTextNotColored(t *testing.T) {
+	model := newNavigationTreeModel(t)
+	model.activeProfile = &config.Profile{ID: "db1", Driver: config.DriverMySQL, ReadOnly: true}
+	model.icons = IconSetForStyle(IconStyleUnicode)
+
+	raw := model.browserList()
+	if !strings.Contains(stripANSI(raw), "\U0001F512") { // 🔒
+		t.Fatalf("read-only connection should show a lock:\n%s", stripANSI(raw))
+	}
+	// Unicode has no brand glyph → nothing is tinted (text stays readable).
+	if strings.Contains(raw, "0;117;143") { // mysql brand color #00758F
+		t.Fatalf("connection text must not be brand-colored in unicode style")
+	}
+
+	// Read-write connection must not show the lock.
+	model.activeProfile.ReadOnly = false
+	if strings.Contains(stripANSI(model.browserList()), "\U0001F512") {
+		t.Fatalf("read-write connection should not show a lock")
+	}
+}
+
+func TestNavigationNerdConnectionTintsOnlyTheIcon(t *testing.T) {
+	model := newNavigationTreeModel(t)
+	model.activeProfile = &config.Profile{ID: "db1", Driver: config.DriverMySQL}
+	model.icons = IconSetForStyle(IconStyleNerd)
+	model.databases = []string{"app"}
+	model.browserCursor = 1 // move selection off the connection row so its icon color shows
+
+	raw := model.browserList()
+	// The mysql brand color tints the glyph, then resets before the id text.
+	mysqlColor := "0;117;143"
+	if !strings.Contains(raw, mysqlColor) {
+		t.Fatalf("nerd connection icon should be brand-colored")
+	}
+	// The id text comes after a reset, i.e. it is not inside the colored run.
+	idx := strings.Index(raw, mysqlColor)
+	if idx < 0 || !strings.Contains(raw[idx:], "\x1b[0m") {
+		t.Fatalf("brand color should be reset before the plain id text")
+	}
+}
+
+func TestConnectionsListUnifiedDriverIconsAndLock(t *testing.T) {
+	model := newNavigationTreeModel(t)
+	model.icons = IconSetForStyle(IconStyleUnicode)
+	model.focus = FocusSidebar
+	model.vault.Profiles = []config.Profile{
+		{ID: "test-mongo", Driver: config.DriverMongo, URIParams: "mongodb://10.0.0.5:27017/app"},
+		{ID: "test-doris", Driver: config.DriverDoris, Host: "10.40.2.14", Port: 9030, ReadOnly: true},
+	}
+
+	raw := model.connectionsList()
+	got := stripANSI(raw)
+
+	if strings.Contains(got, "[mongo]") || strings.Contains(got, "[doris]") {
+		t.Fatalf("connections list should not show [driver] brackets:\n%s", got)
+	}
+	if !strings.Contains(got, "mongo test-mongo") {
+		t.Fatalf("connections list should show the driver before the id:\n%s", got)
+	}
+	// Uniform endpoint: mongo's host comes from its URI (no more ":0").
+	if !strings.Contains(got, "10.0.0.5:27017") || strings.Contains(got, ":0") {
+		t.Fatalf("mongo endpoint should come from the URI, not \":0\":\n%s", got)
+	}
+	if !strings.Contains(got, "» test-doris 10.40.2.14:9030") {
+		t.Fatalf("doris row should be uniform (» icon, id, endpoint):\n%s", got)
+	}
+	if !strings.Contains(got, "\U0001F512") {
+		t.Fatalf("read-only connection should show a lock:\n%s", got)
+	}
+	// Unicode style: no brand color on the text.
+	if strings.Contains(raw, "71;162;72") {
+		t.Fatalf("text must not be brand-colored in unicode style")
+	}
+}
+
+func TestNavigationRedisKeysShowSubTypeIcons(t *testing.T) {
+	model := newNavigationTreeModel(t)
+	model.activeProfile = &config.Profile{ID: "cache", Driver: config.DriverRedis}
+	model.icons = IconSetForStyle(IconStyleUnicode)
+	model.databases = []string{"0"}
+	model.selectedDB = "0"
+	model.expandedDBs = map[string]bool{"0": true}
+	model.databaseObjects = map[string][]db.Object{
+		"0": {
+			{Name: "user:1", Type: db.ObjectKey, SubType: "hash"},
+			{Name: "jobs", Type: db.ObjectKey, SubType: "list"},
+		},
+	}
+
+	got := stripANSI(model.browserList())
+	if !strings.Contains(got, "# user:1 (hash)") {
+		t.Fatalf("hash key should show # icon and (hash):\n%s", got)
+	}
+	if !strings.Contains(got, "☰ jobs (list)") {
+		t.Fatalf("list key should show ☰ icon and (list):\n%s", got)
+	}
+}
+
+func TestNavigationNerdConnectionUsesBrandGlyphNotText(t *testing.T) {
+	model := newNavigationTreeModel(t)
+	model.activeProfile = &config.Profile{ID: "db1", Driver: config.DriverMySQL}
+	model.icons = IconSetForStyle(IconStyleNerd)
+
+	got := stripANSI(model.browserList())
+	glyph, _ := IconSetForStyle(IconStyleNerd).DriverIcon(config.DriverMySQL)
+	if !strings.Contains(got, glyph) {
+		t.Fatalf("nerd connection should show the devicon brand glyph:\n%q", got)
+	}
+	if strings.Contains(got, "mysql db1") {
+		t.Fatalf("nerd connection should not also show the driver name as text:\n%q", got)
 	}
 }
 
@@ -282,27 +396,50 @@ func TestNavigationVerticalScrollbarIsRenderedForOverflow(t *testing.T) {
 	}
 }
 
-func TestNavigationStrongCursorOnlyRendersWhenSidebarFocused(t *testing.T) {
+func TestNavigationCursorVisibleFocusedStrongUnfocusedDim(t *testing.T) {
 	model := newNavigationTreeModel(t)
 	model.activeProfile = &config.Profile{ID: "mongo-prod", Driver: config.DriverMongo}
 	model.icons = IconSetForStyle(IconStyleUnicode)
 	model.databases = []string{"app"}
 	model.browserCursor = 1
+	theme := defaultTheme()
+	strongBg := backgroundANSI(theme.selected)
+	dimBg := backgroundANSI(theme.selectedDim)
 
 	model.focus = FocusSidebar
-	focused := stripANSI(model.browserList())
-	if !strings.Contains(focused, ">   ▸ ◆ app") {
-		t.Fatalf("focused navigation should show strong cursor:\n%s", focused)
+	focusedRaw := model.browserList()
+	if !strings.Contains(stripANSI(focusedRaw), ">   ▸ ◆ app") {
+		t.Fatalf("focused navigation should show the cursor marker:\n%s", stripANSI(focusedRaw))
+	}
+	if !strings.Contains(focusedRaw, strongBg) {
+		t.Fatalf("focused navigation should use the strong selection color")
 	}
 
+	// Unfocused: the cursor position must remain visible, just dimmer.
 	model.focus = FocusMain
-	unfocused := stripANSI(model.browserList())
-	if strings.Contains(unfocused, ">") {
-		t.Fatalf("unfocused navigation should not show strong cursor:\n%s", unfocused)
+	unfocusedRaw := model.browserList()
+	if !strings.Contains(stripANSI(unfocusedRaw), ">   ▸ ◆ app") {
+		t.Fatalf("unfocused navigation should still show the cursor position:\n%s", stripANSI(unfocusedRaw))
 	}
-	if !strings.Contains(unfocused, "▸ ◆ app") {
-		t.Fatalf("unfocused navigation should keep weak selected row content:\n%s", unfocused)
+	if !strings.Contains(unfocusedRaw, dimBg) {
+		t.Fatalf("unfocused navigation should use the dim selection color")
 	}
+	if strings.Contains(unfocusedRaw, strongBg) {
+		t.Fatalf("unfocused navigation should not use the strong selection color")
+	}
+}
+
+// backgroundANSI returns the SGR escape a style emits for its background, so
+// tests can assert which highlight color was applied.
+func backgroundANSI(style lipgloss.Style) string {
+	rendered := style.Render(" ")
+	if i := strings.LastIndex(rendered, "\x1b["); i >= 0 {
+		// The leading escape sequence carries the colors; grab up to the first 'm'.
+		if end := strings.IndexByte(rendered, 'm'); end >= 0 {
+			return rendered[:end+1]
+		}
+	}
+	return rendered
 }
 
 func TestNavigationSlashSearchJumpsWithoutFilteringTree(t *testing.T) {

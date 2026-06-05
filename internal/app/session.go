@@ -19,25 +19,25 @@ type connSession struct {
 	profile config.Profile
 	adapter db.Adapter
 
-	databases       []string
-	objects         []db.Object
-	databaseObjects map[string][]db.Object
-	expandedDBs     map[string]bool
-	expandedMeta    map[string]bool
-	selectedDB      string
-	databaseIndex   int
-	objectIndex     int
-	browserCursor   int
+	databases           []string
+	objects             []db.Object
+	databaseObjects     map[string][]db.Object
+	expandedDBs         map[string]bool
+	expandedMeta        map[string]bool
+	selectedDB          string
+	databaseIndex       int
+	objectIndex         int
+	browserCursor       int
 	navVerticalOffset   int
 	navHorizontalOffset int
 
-	target        db.Target
-	result        result.Set
-	resultView    ResultView
-	workspaceMode workspaceMode
-	workspaceTabs []workspaceTab
-	activeTabIndex int
-	nextQueryTabID int
+	target          db.Target
+	result          result.Set
+	resultView      ResultView
+	workspaceMode   workspaceMode
+	workspaceTabs   []workspaceTab
+	activeTabIndex  int
+	nextQueryTabID  int
 	queryFieldCache map[string][]suggest.Field
 
 	redisCursor  uint64

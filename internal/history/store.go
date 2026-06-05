@@ -28,16 +28,16 @@ const (
 )
 
 type Entry struct {
-	ID             string    `json:"id"`
-	ProfileID      string    `json:"profile_id"`
-	Driver         string    `json:"driver"`
-	Database       string    `json:"database,omitempty"`
-	Action         Action    `json:"action"`
-	Statement      string    `json:"statement"`
-	Status         Status    `json:"status"`
-	Error          string    `json:"error,omitempty"`
-	AffectedRows   int64     `json:"affected_rows"`
-	DurationMillis int64     `json:"duration_millis"`
+	ID             string `json:"id"`
+	ProfileID      string `json:"profile_id"`
+	Driver         string `json:"driver"`
+	Database       string `json:"database,omitempty"`
+	Action         Action `json:"action"`
+	Statement      string `json:"statement"`
+	Status         Status `json:"status"`
+	Error          string `json:"error,omitempty"`
+	AffectedRows   int64  `json:"affected_rows"`
+	DurationMillis int64  `json:"duration_millis"`
 	// StartedAt is the most recent execution time (merged entries keep the latest).
 	StartedAt time.Time `json:"started_at"`
 	// ExecutionCount is the hotness: how many executions merged into this entry.

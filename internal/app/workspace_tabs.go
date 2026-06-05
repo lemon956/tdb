@@ -67,7 +67,7 @@ type workspaceTab struct {
 	ResultColumn            int
 	ResultAnchorRow         int
 	ResultAnchorColumn      int
-	ResultCursorRow         int // selected row in a query result list
+	ResultCursorRow         int  // selected row in a query result list
 	RowDetail               bool // single-row detail subpage open
 	Status                  string
 	Error                   string
@@ -498,6 +498,9 @@ func (m *Model) workspaceQueryContent(tab workspaceTab) string {
 	view.MaxWidth = m.workspaceContentWidth()
 	if tab.Result.Table != nil && len(tab.Result.Table.Rows) > 0 {
 		view.Selectable = m.focus == FocusMain && tab.WorkspaceFocus == workspaceFocusResult
+		// Always mark the current row so its position stays visible (dim when the
+		// result pane is not focused, bright when it is).
+		view.MarkCursor = true
 		view.SelectedRow = tab.ResultCursorRow
 	}
 	b.WriteString(view.Render(tab.Result))

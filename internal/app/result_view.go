@@ -19,7 +19,10 @@ type ResultView struct {
 	// packed to fit it and every line is clipped to it so wide values never wrap.
 	MaxWidth int
 	// Selectable highlights SelectedRow as the current row (query result list).
-	Selectable  bool
+	Selectable bool
+	// MarkCursor shows SelectedRow with a dimmed highlight even when the view is
+	// not Selectable (not focused), so the cursor position stays visible.
+	MarkCursor  bool
 	SelectedRow int
 }
 
@@ -127,6 +130,8 @@ func (v ResultView) renderTable(table result.Table) string {
 		switch {
 		case v.Selectable && row == v.SelectedRow:
 			rowText = theme.selected.Render(rowText)
+		case v.MarkCursor && row == v.SelectedRow:
+			rowText = theme.selectedDim.Render(rowText)
 		case row%2 == 1:
 			rowText = theme.rowAlt.Render(rowText)
 		}

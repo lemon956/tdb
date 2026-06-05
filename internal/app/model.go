@@ -51,25 +51,27 @@ type Model struct {
 	master      string
 	openAdapter func(config.Profile) (db.Adapter, error)
 
-	page               Page
-	input              CommandInput
-	message            string
-	lastCopiedText     string
-	form               *connectionForm
-	helpOpen           bool
-	errBox             *errorBox
-	modal              *modalState
-	lastClickID        string
-	lastClickAt        time.Time
-	width              int
-	height             int
+	page                 Page
+	input                CommandInput
+	unlockCommand        bool   // unlock screen: typing a command (quit-only)
+	unlockPasswordDraft  string // password preserved while in unlock command mode
+	message              string
+	lastCopiedText       string
+	form                 *connectionForm
+	helpOpen             bool
+	errBox               *errorBox
+	modal                *modalState
+	lastClickID          string
+	lastClickAt          time.Time
+	width                int
+	height               int
 	sidebarWidthOverride int
-	resizingSidebar    bool
-	focus              Focus
-	previousFocus      Focus
-	modalPreviousFocus Focus
-	hitboxes           HitboxRegistry
-	icons              IconSet
+	resizingSidebar      bool
+	focus                Focus
+	previousFocus        Focus
+	modalPreviousFocus   Focus
+	hitboxes             HitboxRegistry
+	icons                IconSet
 
 	activeProfile       *config.Profile
 	adapter             db.Adapter
@@ -171,9 +173,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.handleMouse(context.Background(), msg)
 		return m, m.takeCmd()
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c":
-			return m, tea.Quit
+		// Ctrl+C intentionally does NOT quit; the only way to exit is the ":q"
+		// command (see handleGlobalCommand).
+		// The unlock screen owns its keys: typing the password, plus a quit-only
+		// command sub-mode invoked with ":".
+		if m.page == PageUnlock {
+			if cmd, handled := m.handleUnlockKey(msg); handled {
+				return m, cmd
+			}
 		}
 		// Connection-tab switching (Alt+arrows / Alt+digits) works from anywhere.
 		if m.handleConnectionTabKey(msg) {
@@ -494,13 +501,21 @@ func (m *Model) legacyView() string {
 	if m.page != PageUnlock {
 		b.WriteString("\nCommand: " + m.input.Value() + "\n")
 		m.viewSuggestions(&b)
-		b.WriteString("Type `help` for commands. Esc goes back. Ctrl+C quits.\n")
+		b.WriteString("Type `help` for commands. Esc goes back. :q quits.\n")
 	}
 	return b.String()
 }
 
 func (m *Model) HandleLine(ctx context.Context, line string) {
 	line = strings.TrimSpace(line)
+	// ":q" quits from anywhere, including the unlock screen where there is no
+	// command line (the password input would otherwise swallow it). The command
+	// line itself routes the colon-less "q"/"quit"/"exit" via handleGlobalCommand.
+	if line == ":q" || line == ":quit" || line == ":exit" {
+		m.nextCmd = tea.Quit
+		m.message = "bye"
+		return
+	}
 	if m.pending != nil {
 		m.handleConfirmation(ctx, strings.ToLower(line))
 		return
@@ -632,6 +647,11 @@ func (m *Model) handleGlobalCommand(ctx context.Context, line string) bool {
 		m.runPageAction(ctx, actionRefresh)
 	case "back":
 		m.back()
+	case "q", "quit", "exit":
+		// The only way to exit the program. takeCmd() forwards this to Bubble Tea
+		// after HandleLine returns.
+		m.nextCmd = tea.Quit
+		m.message = "bye"
 	case "db", "next", "/":
 		m.handleBrowser(ctx, line)
 	default:
@@ -658,6 +678,67 @@ func looksExecutableStatement(line string) bool {
 		}
 	}
 	return false
+}
+
+// handleUnlockKey owns all key handling on the password screen. Normally keys
+// edit the password; pressing ":" opens a quit-only command sub-mode so the user
+// can exit before unlocking (Ctrl+C no longer quits). Only ":q"/"q"/"quit"/"exit"
+// are honored there — every other command is denied.
+func (m *Model) handleUnlockKey(msg tea.KeyMsg) (tea.Cmd, bool) {
+	if m.unlockCommand {
+		switch msg.String() {
+		case "esc":
+			m.exitUnlockCommand()
+		case "enter":
+			cmd := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(m.input.Value()), ":"))
+			switch strings.ToLower(cmd) {
+			case "q", "quit", "exit":
+				m.nextCmd = tea.Quit
+				return tea.Quit, true
+			default:
+				m.exitUnlockCommand()
+				m.message = "locked: only :q is available before unlocking"
+			}
+		case "backspace", "ctrl+h":
+			if m.input.Value() == "" {
+				m.exitUnlockCommand()
+			} else {
+				m.input.Backspace()
+			}
+		default:
+			if len(msg.Runes) > 0 {
+				m.input.Insert(string(msg.Runes))
+			}
+		}
+		return nil, true
+	}
+
+	switch msg.String() {
+	case ":":
+		// Enter the quit-only command sub-mode, preserving any typed password.
+		m.unlockPasswordDraft = m.input.Value()
+		m.input.Clear()
+		m.unlockCommand = true
+		m.message = "command (locked): only :q to quit, Esc to go back"
+	case "enter":
+		m.unlock(m.input.Value())
+		m.input.Clear()
+	case "backspace", "ctrl+h":
+		m.input.Backspace()
+	case "esc":
+		// nothing to go back to before unlocking
+	default:
+		if len(msg.Runes) > 0 {
+			m.input.Insert(string(msg.Runes))
+		}
+	}
+	return nil, true
+}
+
+func (m *Model) exitUnlockCommand() {
+	m.unlockCommand = false
+	m.input.SetValue(m.unlockPasswordDraft)
+	m.unlockPasswordDraft = ""
 }
 
 func (m *Model) unlock(master string) {
@@ -1210,9 +1291,19 @@ func (m *Model) nextRedisScan(ctx context.Context) {
 		return
 	}
 	m.redisCursor = scan.NextCursor
+	var keyTypes []string
+	if typer, ok := m.adapter.(interface {
+		KeyTypes(context.Context, []string) ([]string, error)
+	}); ok {
+		keyTypes, _ = typer.KeyTypes(ctx, scan.Keys)
+	}
 	m.objects = make([]db.Object, 0, len(scan.Keys))
-	for _, key := range scan.Keys {
-		m.objects = append(m.objects, db.Object{Name: key, Type: db.ObjectKey})
+	for i, key := range scan.Keys {
+		obj := db.Object{Name: key, Type: db.ObjectKey}
+		if i < len(keyTypes) {
+			obj.SubType = keyTypes[i]
+		}
+		m.objects = append(m.objects, obj)
 	}
 	m.message = fmt.Sprintf("redis scan cursor=%d keys=%d", scan.NextCursor, len(scan.Keys))
 }

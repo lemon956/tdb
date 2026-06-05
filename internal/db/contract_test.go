@@ -1,6 +1,38 @@
 package db
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+)
+
+func TestObjectSubTypeRoundTrips(t *testing.T) {
+	in := Object{Name: "user:1", Type: ObjectKey, SubType: "hash"}
+	raw, err := json.Marshal(in)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var out Object
+	if err := json.Unmarshal(raw, &out); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if out != in {
+		t.Fatalf("round-trip = %+v, want %+v", out, in)
+	}
+	// SubType is omitted when empty.
+	plain, _ := json.Marshal(Object{Name: "users", Type: ObjectTable})
+	if string(plain) == "" || containsSub(string(plain)) {
+		t.Fatalf("empty SubType should be omitted, got %s", plain)
+	}
+}
+
+func containsSub(s string) bool {
+	for i := 0; i+9 <= len(s); i++ {
+		if s[i:i+9] == "sub_type\"" {
+			return true
+		}
+	}
+	return false
+}
 
 func TestPageSanitizesLimitAndOffset(t *testing.T) {
 	page := NewPage(-5, -1)

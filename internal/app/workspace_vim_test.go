@@ -84,7 +84,10 @@ func TestDataCursorLineAndWordMotions(t *testing.T) {
 	tab.ResultColumn = 0
 	model.syncActiveTabState()
 
-	press := func(r rune) { up, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}}); model = up.(*Model) }
+	press := func(r rune) {
+		up, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		model = up.(*Model)
+	}
 	press('$')
 	if tab = model.activeWorkspaceTab(); tab.ResultColumn == 0 {
 		t.Fatalf("'$' should move to line end, col=%d", tab.ResultColumn)
