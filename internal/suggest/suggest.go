@@ -25,9 +25,9 @@ type Field struct {
 }
 
 type Suggestion struct {
-	Value  string
-	Label  string
-	Detail string
+	Value  string `json:"value"`
+	Label  string `json:"label,omitempty"`
+	Detail string `json:"detail,omitempty"`
 }
 
 var pageCommands = map[string][]Suggestion{
@@ -59,284 +59,6 @@ var pageCommands = map[string][]Suggestion{
 	"history": {
 		{Value: "back", Detail: "return"},
 	},
-}
-
-var sqlKeywords = []Suggestion{
-	{Value: "SELECT", Detail: "read rows"},
-	{Value: "FROM", Detail: "table source"},
-	{Value: "WHERE", Detail: "filter rows"},
-	{Value: "JOIN", Detail: "join table"},
-	{Value: "LEFT JOIN", Detail: "left join table"},
-	{Value: "RIGHT JOIN", Detail: "right join table"},
-	{Value: "INNER JOIN", Detail: "inner join table"},
-	{Value: "INSERT", Detail: "insert rows"},
-	{Value: "UPDATE", Detail: "update rows"},
-	{Value: "DELETE", Detail: "delete rows"},
-	{Value: "ORDER BY", Detail: "sort rows"},
-	{Value: "GROUP BY", Detail: "aggregate rows"},
-	{Value: "HAVING", Detail: "filter groups"},
-	{Value: "LIMIT", Detail: "limit rows"},
-	{Value: "OFFSET", Detail: "skip rows"},
-	{Value: "DISTINCT", Detail: "unique rows"},
-	{Value: "UNION", Detail: "combine results"},
-	{Value: "UNION ALL", Detail: "combine keeping dups"},
-	{Value: "AS", Detail: "alias"},
-	{Value: "ON", Detail: "join condition"},
-	{Value: "AND", Detail: "logic and"},
-	{Value: "OR", Detail: "logic or"},
-	{Value: "NOT", Detail: "logic not"},
-	{Value: "IN", Detail: "membership"},
-	{Value: "LIKE", Detail: "pattern match"},
-	{Value: "BETWEEN", Detail: "range"},
-	{Value: "IS NULL", Detail: "null test"},
-	{Value: "IS NOT NULL", Detail: "non-null test"},
-	{Value: "ASC", Detail: "ascending"},
-	{Value: "DESC", Detail: "descending"},
-	{Value: "SHOW", Detail: "show metadata"},
-	{Value: "DESCRIBE", Detail: "describe table"},
-	{Value: "EXPLAIN", Detail: "explain query"},
-}
-
-// sqlCommonFunctions are built-in functions supported by both MySQL and Doris.
-var sqlCommonFunctions = []Suggestion{
-	// aggregate
-	{Value: "COUNT(", Detail: "aggregate"},
-	{Value: "SUM(", Detail: "aggregate"},
-	{Value: "AVG(", Detail: "aggregate"},
-	{Value: "MIN(", Detail: "aggregate"},
-	{Value: "MAX(", Detail: "aggregate"},
-	{Value: "GROUP_CONCAT(", Detail: "aggregate"},
-	{Value: "STDDEV(", Detail: "aggregate"},
-	{Value: "VARIANCE(", Detail: "aggregate"},
-	// string
-	{Value: "CONCAT(", Detail: "string"},
-	{Value: "CONCAT_WS(", Detail: "string"},
-	{Value: "SUBSTRING(", Detail: "string"},
-	{Value: "LEFT(", Detail: "string"},
-	{Value: "RIGHT(", Detail: "string"},
-	{Value: "LENGTH(", Detail: "string"},
-	{Value: "CHAR_LENGTH(", Detail: "string"},
-	{Value: "LOWER(", Detail: "string"},
-	{Value: "UPPER(", Detail: "string"},
-	{Value: "TRIM(", Detail: "string"},
-	{Value: "LTRIM(", Detail: "string"},
-	{Value: "RTRIM(", Detail: "string"},
-	{Value: "REPLACE(", Detail: "string"},
-	{Value: "REVERSE(", Detail: "string"},
-	{Value: "LPAD(", Detail: "string"},
-	{Value: "RPAD(", Detail: "string"},
-	{Value: "LOCATE(", Detail: "string"},
-	{Value: "INSTR(", Detail: "string"},
-	{Value: "REGEXP_REPLACE(", Detail: "string"},
-	{Value: "SPLIT_PART(", Detail: "string"},
-	// numeric
-	{Value: "ABS(", Detail: "numeric"},
-	{Value: "CEIL(", Detail: "numeric"},
-	{Value: "FLOOR(", Detail: "numeric"},
-	{Value: "ROUND(", Detail: "numeric"},
-	{Value: "TRUNCATE(", Detail: "numeric"},
-	{Value: "MOD(", Detail: "numeric"},
-	{Value: "POW(", Detail: "numeric"},
-	{Value: "SQRT(", Detail: "numeric"},
-	{Value: "EXP(", Detail: "numeric"},
-	{Value: "LN(", Detail: "numeric"},
-	{Value: "LOG(", Detail: "numeric"},
-	{Value: "SIGN(", Detail: "numeric"},
-	{Value: "RAND(", Detail: "numeric"},
-	{Value: "GREATEST(", Detail: "numeric"},
-	{Value: "LEAST(", Detail: "numeric"},
-	// date/time
-	{Value: "NOW(", Detail: "date"},
-	{Value: "CURDATE(", Detail: "date"},
-	{Value: "CURTIME(", Detail: "date"},
-	{Value: "CURRENT_TIMESTAMP(", Detail: "date"},
-	{Value: "DATE(", Detail: "date"},
-	{Value: "DATE_FORMAT(", Detail: "date"},
-	{Value: "DATE_ADD(", Detail: "date"},
-	{Value: "DATE_SUB(", Detail: "date"},
-	{Value: "DATEDIFF(", Detail: "date"},
-	{Value: "TIMESTAMPDIFF(", Detail: "date"},
-	{Value: "EXTRACT(", Detail: "date"},
-	{Value: "YEAR(", Detail: "date"},
-	{Value: "MONTH(", Detail: "date"},
-	{Value: "DAY(", Detail: "date"},
-	{Value: "HOUR(", Detail: "date"},
-	{Value: "MINUTE(", Detail: "date"},
-	{Value: "SECOND(", Detail: "date"},
-	{Value: "WEEK(", Detail: "date"},
-	{Value: "DAYOFWEEK(", Detail: "date"},
-	{Value: "UNIX_TIMESTAMP(", Detail: "date"},
-	{Value: "FROM_UNIXTIME(", Detail: "date"},
-	{Value: "STR_TO_DATE(", Detail: "date"},
-	// conditional / conversion
-	{Value: "IF(", Detail: "logic"},
-	{Value: "IFNULL(", Detail: "logic"},
-	{Value: "NULLIF(", Detail: "logic"},
-	{Value: "COALESCE(", Detail: "logic"},
-	{Value: "CASE", Detail: "logic"},
-	{Value: "CAST(", Detail: "convert"},
-	{Value: "CONVERT(", Detail: "convert"},
-	// json
-	{Value: "JSON_EXTRACT(", Detail: "json"},
-	{Value: "JSON_OBJECT(", Detail: "json"},
-	{Value: "JSON_ARRAY(", Detail: "json"},
-	{Value: "JSON_CONTAINS(", Detail: "json"},
-	{Value: "JSON_KEYS(", Detail: "json"},
-	{Value: "JSON_LENGTH(", Detail: "json"},
-	// window
-	{Value: "ROW_NUMBER(", Detail: "window"},
-	{Value: "RANK(", Detail: "window"},
-	{Value: "DENSE_RANK(", Detail: "window"},
-	{Value: "LAG(", Detail: "window"},
-	{Value: "LEAD(", Detail: "window"},
-	{Value: "FIRST_VALUE(", Detail: "window"},
-	{Value: "LAST_VALUE(", Detail: "window"},
-	{Value: "NTILE(", Detail: "window"},
-	{Value: "OVER(", Detail: "window"},
-}
-
-// mysqlFunctions are MySQL-specific built-ins.
-var mysqlFunctions = []Suggestion{
-	{Value: "FIELD(", Detail: "string"},
-	{Value: "ELT(", Detail: "string"},
-	{Value: "FIND_IN_SET(", Detail: "string"},
-	{Value: "MAKE_SET(", Detail: "string"},
-	{Value: "SUBSTRING_INDEX(", Detail: "string"},
-	{Value: "INET_ATON(", Detail: "network"},
-	{Value: "INET_NTOA(", Detail: "network"},
-	{Value: "UUID(", Detail: "misc"},
-	{Value: "MD5(", Detail: "hash"},
-	{Value: "SHA2(", Detail: "hash"},
-	{Value: "JSON_PRETTY(", Detail: "json"},
-	{Value: "JSON_MERGE_PATCH(", Detail: "json"},
-	{Value: "JSON_SET(", Detail: "json"},
-	{Value: "LAST_INSERT_ID(", Detail: "misc"},
-}
-
-// dorisFunctions are Doris-specific built-ins (bitmap/HLL/array analytics).
-var dorisFunctions = []Suggestion{
-	{Value: "APPROX_COUNT_DISTINCT(", Detail: "aggregate"},
-	{Value: "BITMAP_UNION(", Detail: "bitmap"},
-	{Value: "BITMAP_COUNT(", Detail: "bitmap"},
-	{Value: "BITMAP_UNION_COUNT(", Detail: "bitmap"},
-	{Value: "TO_BITMAP(", Detail: "bitmap"},
-	{Value: "BITMAP_HASH(", Detail: "bitmap"},
-	{Value: "BITMAP_AND(", Detail: "bitmap"},
-	{Value: "BITMAP_OR(", Detail: "bitmap"},
-	{Value: "HLL_UNION_AGG(", Detail: "hll"},
-	{Value: "HLL_CARDINALITY(", Detail: "hll"},
-	{Value: "HLL_HASH(", Detail: "hll"},
-	{Value: "ARRAY(", Detail: "array"},
-	{Value: "ARRAY_CONTAINS(", Detail: "array"},
-	{Value: "ARRAY_MAP(", Detail: "array"},
-	{Value: "ARRAY_FILTER(", Detail: "array"},
-	{Value: "ARRAY_SORT(", Detail: "array"},
-	{Value: "ARRAY_SIZE(", Detail: "array"},
-	{Value: "ARRAYS_OVERLAP(", Detail: "array"},
-	{Value: "ELEMENT_AT(", Detail: "array"},
-	{Value: "EXPLODE(", Detail: "array"},
-	{Value: "MASK(", Detail: "string"},
-	{Value: "WIDTH_BUCKET(", Detail: "numeric"},
-}
-
-var redisCommands = []Suggestion{
-	{Value: "GET", Detail: "read string"},
-	{Value: "SET", Detail: "write string"},
-	{Value: "DEL", Detail: "delete keys"},
-	{Value: "SCAN", Detail: "cursor scan keys"},
-	{Value: "HGET", Detail: "read hash field"},
-	{Value: "HGETALL", Detail: "read hash"},
-	{Value: "HSET", Detail: "write hash field"},
-	{Value: "LRANGE", Detail: "read list range"},
-	{Value: "LPUSH", Detail: "push list left"},
-	{Value: "RPUSH", Detail: "push list right"},
-	{Value: "SMEMBERS", Detail: "read set members"},
-	{Value: "SADD", Detail: "add set member"},
-	{Value: "ZADD", Detail: "add sorted-set member"},
-	{Value: "ZRANGE", Detail: "read sorted-set range"},
-	{Value: "TTL", Detail: "read ttl"},
-	{Value: "EXPIRE", Detail: "set ttl"},
-	// keys
-	{Value: "EXISTS", Detail: "key"},
-	{Value: "TYPE", Detail: "key"},
-	{Value: "KEYS", Detail: "key"},
-	{Value: "RENAME", Detail: "key"},
-	{Value: "PERSIST", Detail: "key"},
-	{Value: "PTTL", Detail: "key"},
-	{Value: "PEXPIRE", Detail: "key"},
-	{Value: "DUMP", Detail: "key"},
-	{Value: "RANDOMKEY", Detail: "key"},
-	{Value: "UNLINK", Detail: "key"},
-	// string
-	{Value: "INCR", Detail: "string"},
-	{Value: "DECR", Detail: "string"},
-	{Value: "INCRBY", Detail: "string"},
-	{Value: "DECRBY", Detail: "string"},
-	{Value: "INCRBYFLOAT", Detail: "string"},
-	{Value: "APPEND", Detail: "string"},
-	{Value: "GETSET", Detail: "string"},
-	{Value: "MGET", Detail: "string"},
-	{Value: "MSET", Detail: "string"},
-	{Value: "SETEX", Detail: "string"},
-	{Value: "SETNX", Detail: "string"},
-	{Value: "PSETEX", Detail: "string"},
-	{Value: "STRLEN", Detail: "string"},
-	{Value: "GETRANGE", Detail: "string"},
-	{Value: "SETRANGE", Detail: "string"},
-	// hash
-	{Value: "HDEL", Detail: "hash"},
-	{Value: "HEXISTS", Detail: "hash"},
-	{Value: "HKEYS", Detail: "hash"},
-	{Value: "HVALS", Detail: "hash"},
-	{Value: "HLEN", Detail: "hash"},
-	{Value: "HINCRBY", Detail: "hash"},
-	{Value: "HMGET", Detail: "hash"},
-	{Value: "HSETNX", Detail: "hash"},
-	{Value: "HSCAN", Detail: "hash"},
-	// list
-	{Value: "LPOP", Detail: "list"},
-	{Value: "RPOP", Detail: "list"},
-	{Value: "LLEN", Detail: "list"},
-	{Value: "LINDEX", Detail: "list"},
-	{Value: "LSET", Detail: "list"},
-	{Value: "LREM", Detail: "list"},
-	{Value: "LINSERT", Detail: "list"},
-	{Value: "RPOPLPUSH", Detail: "list"},
-	{Value: "BLPOP", Detail: "list"},
-	// set
-	{Value: "SREM", Detail: "set"},
-	{Value: "SCARD", Detail: "set"},
-	{Value: "SISMEMBER", Detail: "set"},
-	{Value: "SPOP", Detail: "set"},
-	{Value: "SRANDMEMBER", Detail: "set"},
-	{Value: "SINTER", Detail: "set"},
-	{Value: "SUNION", Detail: "set"},
-	{Value: "SDIFF", Detail: "set"},
-	{Value: "SSCAN", Detail: "set"},
-	// sorted set
-	{Value: "ZREM", Detail: "zset"},
-	{Value: "ZSCORE", Detail: "zset"},
-	{Value: "ZRANK", Detail: "zset"},
-	{Value: "ZREVRANK", Detail: "zset"},
-	{Value: "ZREVRANGE", Detail: "zset"},
-	{Value: "ZRANGEBYSCORE", Detail: "zset"},
-	{Value: "ZCARD", Detail: "zset"},
-	{Value: "ZCOUNT", Detail: "zset"},
-	{Value: "ZINCRBY", Detail: "zset"},
-	{Value: "ZSCAN", Detail: "zset"},
-	// bitmap / hll / pubsub
-	{Value: "SETBIT", Detail: "bitmap"},
-	{Value: "GETBIT", Detail: "bitmap"},
-	{Value: "BITCOUNT", Detail: "bitmap"},
-	{Value: "PFADD", Detail: "hll"},
-	{Value: "PFCOUNT", Detail: "hll"},
-	{Value: "PFMERGE", Detail: "hll"},
-	{Value: "PUBLISH", Detail: "pubsub"},
-	{Value: "SUBSCRIBE", Detail: "pubsub"},
-	// server
-	{Value: "DBSIZE", Detail: "server"},
-	{Value: "INFO", Detail: "server"},
-	{Value: "FLUSHDB", Detail: "server"},
 }
 
 var mongoFragments = []Suggestion{
@@ -375,31 +97,6 @@ var mongoMethods = []Suggestion{
 	{Value: "drop", Detail: "drop collection"},
 }
 
-var mongoQueryOperators = []Suggestion{
-	{Value: "$eq", Detail: "compare"},
-	{Value: "$in", Detail: "compare"},
-	{Value: "$gt", Detail: "compare"},
-	{Value: "$gte", Detail: "compare"},
-	{Value: "$lt", Detail: "compare"},
-	{Value: "$lte", Detail: "compare"},
-	{Value: "$ne", Detail: "compare"},
-	{Value: "$nin", Detail: "compare"},
-	{Value: "$and", Detail: "logic"},
-	{Value: "$or", Detail: "logic"},
-	{Value: "$not", Detail: "logic"},
-	{Value: "$nor", Detail: "logic"},
-	{Value: "$exists", Detail: "element"},
-	{Value: "$type", Detail: "element"},
-	{Value: "$regex", Detail: "evaluation"},
-	{Value: "$expr", Detail: "evaluation"},
-	{Value: "$mod", Detail: "evaluation"},
-	{Value: "$text", Detail: "evaluation"},
-	{Value: "$where", Detail: "evaluation"},
-	{Value: "$all", Detail: "array"},
-	{Value: "$elemMatch", Detail: "array"},
-	{Value: "$size", Detail: "array"},
-}
-
 var mongoUpdateOperators = []Suggestion{
 	{Value: "$set", Detail: "field"},
 	{Value: "$unset", Detail: "field"},
@@ -415,63 +112,14 @@ var mongoUpdateOperators = []Suggestion{
 	{Value: "$addToSet", Detail: "array"},
 	{Value: "$pop", Detail: "array"},
 	{Value: "$pullAll", Detail: "array"},
+	{Value: "$bit", Detail: "bitwise"},
+	{Value: "$", Detail: "array (positional)"},
+	{Value: "$[]", Detail: "array (all)"},
+	{Value: "$[<identifier>]", Detail: "array (filtered)"},
 	{Value: "$each", Detail: "array modifier"},
-}
-
-// mongoAggregateStages are pipeline stages for aggregate([...]).
-var mongoAggregateStages = []Suggestion{
-	{Value: "$match", Detail: "stage"},
-	{Value: "$group", Detail: "stage"},
-	{Value: "$project", Detail: "stage"},
-	{Value: "$sort", Detail: "stage"},
-	{Value: "$limit", Detail: "stage"},
-	{Value: "$skip", Detail: "stage"},
-	{Value: "$unwind", Detail: "stage"},
-	{Value: "$lookup", Detail: "stage"},
-	{Value: "$count", Detail: "stage"},
-	{Value: "$addFields", Detail: "stage"},
-	{Value: "$facet", Detail: "stage"},
-	{Value: "$bucket", Detail: "stage"},
-	{Value: "$replaceRoot", Detail: "stage"},
-	{Value: "$sortByCount", Detail: "stage"},
-	{Value: "$sample", Detail: "stage"},
-	{Value: "$out", Detail: "stage"},
-	{Value: "$merge", Detail: "stage"},
-}
-
-// mongoAggregateExpr are expression operators used inside aggregation stages.
-var mongoAggregateExpr = []Suggestion{
-	{Value: "$sum", Detail: "expr"},
-	{Value: "$avg", Detail: "expr"},
-	{Value: "$min", Detail: "expr"},
-	{Value: "$max", Detail: "expr"},
-	{Value: "$first", Detail: "expr"},
-	{Value: "$last", Detail: "expr"},
-	{Value: "$push", Detail: "expr"},
-	{Value: "$addToSet", Detail: "expr"},
-	{Value: "$concat", Detail: "expr"},
-	{Value: "$toUpper", Detail: "expr"},
-	{Value: "$toLower", Detail: "expr"},
-	{Value: "$substr", Detail: "expr"},
-	{Value: "$cond", Detail: "expr"},
-	{Value: "$ifNull", Detail: "expr"},
-	{Value: "$switch", Detail: "expr"},
-	{Value: "$add", Detail: "expr"},
-	{Value: "$subtract", Detail: "expr"},
-	{Value: "$multiply", Detail: "expr"},
-	{Value: "$divide", Detail: "expr"},
-	{Value: "$map", Detail: "expr"},
-	{Value: "$filter", Detail: "expr"},
-	{Value: "$arrayElemAt", Detail: "expr"},
-	{Value: "$dateToString", Detail: "expr"},
-	{Value: "$year", Detail: "expr"},
-	{Value: "$month", Detail: "expr"},
-	{Value: "$dayOfMonth", Detail: "expr"},
-	{Value: "$toString", Detail: "expr"},
-	{Value: "$toInt", Detail: "expr"},
-	{Value: "$toDouble", Detail: "expr"},
-	{Value: "$toDate", Detail: "expr"},
-	{Value: "$convert", Detail: "expr"},
+	{Value: "$position", Detail: "array modifier"},
+	{Value: "$slice", Detail: "array modifier"},
+	{Value: "$sort", Detail: "array modifier"},
 }
 
 func Suggest(ctx Context) []Suggestion {
@@ -500,19 +148,20 @@ func Suggest(ctx Context) []Suggestion {
 }
 
 func candidatesFor(ctx Context, input string) []Suggestion {
-	withSQLContext := func(driverFns []Suggestion) []Suggestion {
+	// withSQLContext combines the current table's fields/objects with the driver's
+	// keyword and function lists (vendored from the upstream syntax libraries).
+	withSQLContext := func(keywords, functions []Suggestion) []Suggestion {
 		candidates := append([]Suggestion{}, fieldSuggestions(ctx.Fields)...)
 		candidates = append(candidates, objectSuggestions(ctx.Objects)...)
-		candidates = append(candidates, sqlKeywords...)
-		candidates = append(candidates, sqlCommonFunctions...)
-		candidates = append(candidates, driverFns...)
+		candidates = append(candidates, keywords...)
+		candidates = append(candidates, functions...)
 		return candidates
 	}
 	switch ctx.Driver {
 	case config.DriverMySQL:
-		return withSQLContext(mysqlFunctions)
+		return withSQLContext(mysqlKeywords, mysqlFunctions)
 	case config.DriverDoris:
-		return withSQLContext(dorisFunctions)
+		return withSQLContext(dorisKeywords, dorisFunctions)
 	case config.DriverRedis:
 		return append(objectSuggestions(ctx.Objects), redisCommands...)
 	case config.DriverMongo:

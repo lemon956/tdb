@@ -81,3 +81,17 @@ func TestAdapterRejectsWritesForReadOnlyProfile(t *testing.T) {
 		t.Fatalf("Insert error = %v, want ErrReadOnly", err)
 	}
 }
+
+func TestExecuteEnforcesReadOnlyForWrites(t *testing.T) {
+	a := NewWithDB(config.Profile{ReadOnly: true}, nil)
+	if _, err := a.Execute(context.Background(), db.Command{Text: "DELETE FROM t"}); !errors.Is(err, ErrReadOnly) {
+		t.Fatalf("DELETE on read-only conn = %v, want ErrReadOnly", err)
+	}
+	if _, err := a.Execute(context.Background(), db.Command{Text: "DROP TABLE t"}); !errors.Is(err, ErrReadOnly) {
+		t.Fatalf("DROP on read-only conn = %v, want ErrReadOnly", err)
+	}
+	// A read query passes the read-only gate (then fails on the nil connection).
+	if _, err := a.Execute(context.Background(), db.Command{Text: "SELECT 1"}); errors.Is(err, ErrReadOnly) {
+		t.Fatalf("SELECT on read-only conn must not be rejected as read-only")
+	}
+}

@@ -111,21 +111,55 @@ func (a *Adapter) Preview(ctx context.Context, target db.Target, query db.Query,
 	if err != nil {
 		return result.Set{}, err
 	}
+	// Fetch one extra doc so we can tell the UI whether a next page exists.
+	findLimit := int64(page.Limit)
+	if page.Limit > 0 {
+		findLimit = int64(page.Limit + 1)
+	}
 	cursor, err := a.client.Database(target.Database).Collection(target.Name).Find(
 		ctx,
 		filter,
-		options.Find().SetLimit(int64(page.Limit)).SetSkip(int64(page.Offset)),
+		options.Find().SetLimit(findLimit).SetSkip(int64(page.Offset)),
 	)
 	if err != nil {
 		return result.Set{}, err
 	}
 	defer cursor.Close(ctx)
 
-	var docs []bson.M
-	if err := cursor.All(ctx, &docs); err != nil {
+	set, err := cursorToSet(ctx, cursor, page.Limit)
+	if err != nil {
 		return result.Set{}, err
 	}
-	return docsToSet(docs), nil
+	set.HasMore = set.Truncated // the extra doc means another page is available
+	set.Truncated = false
+	return set, nil
+}
+
+// cursorToSet drains a cursor into a document Set, reading at most limit docs
+// (limit <= 0 means up to db.MaxResultRows) and marking Truncated when more exist.
+func cursorToSet(ctx context.Context, cursor *mongo.Cursor, limit int) (result.Set, error) {
+	if limit <= 0 {
+		limit = db.MaxResultRows
+	}
+	docs := []bson.M{}
+	truncated := false
+	for cursor.Next(ctx) {
+		if len(docs) >= limit {
+			truncated = true
+			break
+		}
+		var doc bson.M
+		if err := cursor.Decode(&doc); err != nil {
+			return result.Set{}, err
+		}
+		docs = append(docs, doc)
+	}
+	if err := cursor.Err(); err != nil {
+		return result.Set{}, err
+	}
+	set := docsToSet(docs)
+	set.Truncated = truncated
+	return set, nil
 }
 
 func (a *Adapter) Metadata(ctx context.Context, target db.Target) (db.ObjectMetadata, error) {
@@ -307,17 +341,17 @@ func (a *Adapter) executeMongosh(ctx context.Context, command db.Command, shell 
 			return result.Set{}, err
 		}
 		defer cursor.Close(ctx)
-		var docs []bson.M
-		if err := cursor.All(ctx, &docs); err != nil {
-			return result.Set{}, err
-		}
-		return docsToSet(docs), nil
+		return cursorToSet(ctx, cursor, db.MaxResultRows)
 	default:
 		return a.executeMongoshMutation(ctx, collection, shell)
 	}
 }
 
 func (a *Adapter) executeMongoshMutation(ctx context.Context, collection *mongo.Collection, shell MongoshCommand) (result.Set, error) {
+	// Writes (insert/update/delete/drop) are blocked on read-only connections.
+	if err := a.ensureWritable(); err != nil {
+		return result.Set{}, err
+	}
 	var affected int64
 	switch shell.Method {
 	case "insertOne":

@@ -1,0 +1,134 @@
+[
+  {
+    "value": "$all",
+    "detail": "query"
+  },
+  {
+    "value": "$and",
+    "detail": "query"
+  },
+  {
+    "value": "$bitsAllClear",
+    "detail": "query"
+  },
+  {
+    "value": "$bitsAllSet",
+    "detail": "query"
+  },
+  {
+    "value": "$bitsAnyClear",
+    "detail": "query"
+  },
+  {
+    "value": "$bitsAnySet",
+    "detail": "query"
+  },
+  {
+    "value": "$comment",
+    "detail": "query"
+  },
+  {
+    "value": "$elemMatch",
+    "detail": "query"
+  },
+  {
+    "value": "$eq",
+    "detail": "query"
+  },
+  {
+    "value": "$exists",
+    "detail": "query"
+  },
+  {
+    "value": "$expr",
+    "detail": "query"
+  },
+  {
+    "value": "$geoIntersects",
+    "detail": "query"
+  },
+  {
+    "value": "$geoWithin",
+    "detail": "query"
+  },
+  {
+    "value": "$gt",
+    "detail": "query"
+  },
+  {
+    "value": "$gte",
+    "detail": "query"
+  },
+  {
+    "value": "$in",
+    "detail": "query"
+  },
+  {
+    "value": "$jsonSchema",
+    "detail": "query"
+  },
+  {
+    "value": "$lt",
+    "detail": "query"
+  },
+  {
+    "value": "$lte",
+    "detail": "query"
+  },
+  {
+    "value": "$mod",
+    "detail": "query"
+  },
+  {
+    "value": "$ne",
+    "detail": "query"
+  },
+  {
+    "value": "$near",
+    "detail": "query"
+  },
+  {
+    "value": "$nearSphere",
+    "detail": "query"
+  },
+  {
+    "value": "$nin",
+    "detail": "query"
+  },
+  {
+    "value": "$nor",
+    "detail": "query"
+  },
+  {
+    "value": "$not",
+    "detail": "query"
+  },
+  {
+    "value": "$or",
+    "detail": "query"
+  },
+  {
+    "value": "$regex",
+    "detail": "query"
+  },
+  {
+    "value": "$size",
+    "detail": "query"
+  },
+  {
+    "value": "$slice",
+    "detail": "query"
+  },
+  {
+    "value": "$text",
+    "detail": "query"
+  },
+  {
+    "value": "$type",
+    "detail": "query"
+  },
+  {
+    "value": "$where",
+    "detail": "query"
+  }
+]

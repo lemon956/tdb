@@ -97,21 +97,15 @@ func (m *Model) querySuggestionOverlay() (string, bool) {
 		return "", false
 	}
 
-	// Column anchor: line prefix width + display column of the cursor.
-	runLines := queryRunButtonLines(tab.QueryBuffer)
-	row, col := queryCursorPosition(tab.QueryBuffer, tab.QueryCursor)
-	var prefixW int
-	if row == 0 {
-		prefixW = lipgloss.Width(queryEditorLinePrefix(m.workspaceCursor(workspaceFocusEditor, *tab), runLines[0]))
-	} else {
-		prefixW = lipgloss.Width(queryEditorLinePrefix("  ", runLines[row]))
-	}
-	left := clamp(prefixW+col, 0, max(0, innerW-boxW))
+	// Anchor under the cursor's VISUAL position (wrap-aware), so the popup follows
+	// the cursor even when a long query line soft-wraps onto several rows.
+	vrow, vcol := m.queryCursorVisualPos(*tab, innerW)
+	left := clamp(vcol, 0, max(0, innerW-boxW))
 
-	// Row anchor inside workspaceContent: row 0 = tab bar, row 1 = status line,
-	// row 2 = buffer line 0, so the cursor's buffer line is at row+2. Float on the
-	// next line, flipping above the cursor when it would overflow the panel.
-	cursorLine := row + 2
+	// Row inside workspaceContent: row 0 = tab bar, row 1 = status line, row 2 =
+	// first buffer (visual) row. Float on the next line, flipping above when it
+	// would overflow the panel.
+	cursorLine := vrow + 2
 	top := cursorLine + 1
 	if top+boxH > innerH {
 		top = max(0, cursorLine-boxH)

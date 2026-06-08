@@ -367,7 +367,7 @@ func (m *Model) loadObjectsForDatabase(ctx context.Context, database string) err
 	if m.adapter == nil {
 		return fmt.Errorf("no active connection")
 	}
-	ctx, cancel := dbContext(ctx)
+	ctx, cancel := m.dbContext(ctx)
 	defer cancel()
 	objects, err := m.adapter.ListObjects(ctx, db.Scope{Database: database})
 	if err != nil {
@@ -413,9 +413,9 @@ func (m *Model) openPreview(ctx context.Context, target db.Target) {
 		m.message = "no active connection"
 		return
 	}
-	ctx, cancel := dbContext(ctx)
+	ctx, cancel := m.dbContext(ctx)
 	defer cancel()
-	res, err := m.adapter.Preview(ctx, target, db.Query{}, db.NewPage(100, 0))
+	res, err := m.adapter.Preview(ctx, target, db.Query{}, db.NewPage(previewPageSize, 0))
 	if err != nil {
 		m.message = err.Error()
 		return
@@ -426,6 +426,10 @@ func (m *Model) openPreview(ctx context.Context, target db.Target) {
 	m.page = PageData
 	m.workspaceMode = workspacePreview
 	m.openDataWorkspaceTab(target, res, workspacePreview)
+	if tab := m.activeWorkspaceTab(); tab != nil {
+		tab.PreviewOffset = 0
+		tab.PreviewHasMore = res.HasMore
+	}
 	m.message = "opened " + target.Name
 }
 
@@ -435,7 +439,7 @@ func (m *Model) openMetadata(ctx context.Context, target db.Target) {
 		m.message = "metadata not available"
 		return
 	}
-	ctx, cancel := dbContext(ctx)
+	ctx, cancel := m.dbContext(ctx)
 	defer cancel()
 	metadata, err := provider.Metadata(ctx, target)
 	if err != nil {

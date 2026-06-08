@@ -46,6 +46,28 @@ type RedisValue struct {
 	Set        []string
 	SortedSet  []redis.Z
 	PreviewCap int64 `json:"preview_cap"`
+	// Truncated is set when the value was larger than the preview cap.
+	Truncated bool `json:"truncated,omitempty"`
+}
+
+// maxStringPreview caps how many bytes of a redis string value are fetched, so a
+// multi-megabyte value cannot be loaded whole into the TUI.
+const maxStringPreview = 64 * 1024
+
+// redisReadOnlyCommands is the allowlist of commands permitted on a read-only
+// connection; anything not listed is treated as a write and rejected.
+var redisReadOnlyCommands = map[string]bool{
+	"GET": true, "MGET": true, "STRLEN": true, "GETRANGE": true, "SUBSTR": true,
+	"EXISTS": true, "TYPE": true, "TTL": true, "PTTL": true, "OBJECT": true,
+	"HGET": true, "HMGET": true, "HGETALL": true, "HKEYS": true, "HVALS": true, "HLEN": true, "HEXISTS": true, "HSCAN": true, "HSTRLEN": true,
+	"LRANGE": true, "LINDEX": true, "LLEN": true, "LPOS": true,
+	"SMEMBERS": true, "SISMEMBER": true, "SMISMEMBER": true, "SCARD": true, "SRANDMEMBER": true, "SSCAN": true, "SINTER": true, "SUNION": true, "SDIFF": true,
+	"ZRANGE": true, "ZRANGEBYSCORE": true, "ZRANGEBYLEX": true, "ZREVRANGE": true, "ZSCORE": true, "ZMSCORE": true, "ZRANK": true, "ZREVRANK": true, "ZCARD": true, "ZCOUNT": true, "ZSCAN": true,
+	"XRANGE": true, "XREVRANGE": true, "XLEN": true, "XREAD": true, "XINFO": true,
+	"SCAN": true, "KEYS": true, "RANDOMKEY": true, "DBSIZE": true,
+	"INFO": true, "PING": true, "ECHO": true, "TIME": true, "MEMORY": true, "DEBUG": true, "COMMAND": true, "CLIENT": true, "CONFIG": true,
+	"BITCOUNT": true, "BITPOS": true, "GETBIT": true, "GEOPOS": true, "GEODIST": true, "GEOSEARCH": true,
+	"PFCOUNT": true, "DUMP": true,
 }
 
 type Adapter struct {
@@ -158,7 +180,7 @@ func (a *Adapter) Preview(ctx context.Context, target db.Target, query db.Query,
 	if err != nil {
 		return result.Set{}, err
 	}
-	return result.Set{Value: value}, nil
+	return result.Set{Value: value, Truncated: value.Truncated}, nil
 }
 
 func (a *Adapter) Metadata(ctx context.Context, target db.Target) (db.ObjectMetadata, error) {
@@ -223,15 +245,34 @@ func (a *Adapter) ReadKey(ctx context.Context, key string) (RedisValue, error) {
 	out := RedisValue{Key: key, Type: valueType, TTL: ttl, PreviewCap: 100}
 	switch valueType {
 	case "string":
-		out.String, err = a.client.Get(ctx, key).Result()
+		// Cap large strings: fetch only the first maxStringPreview bytes.
+		if n, lerr := a.client.StrLen(ctx, key).Result(); lerr == nil && n > maxStringPreview {
+			out.String, err = a.client.GetRange(ctx, key, 0, maxStringPreview-1).Result()
+			out.Truncated = true
+		} else {
+			out.String, err = a.client.Get(ctx, key).Result()
+		}
 	case "hash":
 		out.Hash, err = a.client.HGetAll(ctx, key).Result()
+		if int64(len(out.Hash)) > out.PreviewCap {
+			out.Truncated = true
+		}
 	case "list":
 		out.List, err = a.client.LRange(ctx, key, 0, out.PreviewCap-1).Result()
+		if n, lerr := a.client.LLen(ctx, key).Result(); lerr == nil && n > out.PreviewCap {
+			out.Truncated = true
+		}
 	case "set":
 		out.Set, err = a.client.SMembers(ctx, key).Result()
+		if int64(len(out.Set)) > out.PreviewCap {
+			out.Set = out.Set[:out.PreviewCap]
+			out.Truncated = true
+		}
 	case "zset":
 		out.SortedSet, err = a.client.ZRangeWithScores(ctx, key, 0, out.PreviewCap-1).Result()
+		if n, lerr := a.client.ZCard(ctx, key).Result(); lerr == nil && n > out.PreviewCap {
+			out.Truncated = true
+		}
 	}
 	if err != nil && !errors.Is(err, redis.Nil) {
 		return RedisValue{}, err
@@ -266,12 +307,16 @@ func (a *Adapter) Delete(ctx context.Context, target db.Target, key db.Key) (res
 }
 
 func (a *Adapter) Execute(ctx context.Context, command db.Command) (result.Set, error) {
-	if a.client == nil {
-		return result.Set{}, ErrNoClient
-	}
 	parts := splitCommand(command.Text)
 	if len(parts) == 0 {
 		return result.Set{}, ErrBadCommand
+	}
+	// Enforce read-only: only allow known read commands on a read-only connection.
+	if a.profile.ReadOnly && !redisReadOnlyCommands[strings.ToUpper(parts[0])] {
+		return result.Set{}, ErrReadOnly
+	}
+	if a.client == nil {
+		return result.Set{}, ErrNoClient
 	}
 	args := make([]any, len(parts))
 	for i, part := range parts {

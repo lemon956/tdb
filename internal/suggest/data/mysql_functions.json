@@ -1,0 +1,1930 @@
+[
+  {
+    "value": "ABS(",
+    "detail": "fn"
+  },
+  {
+    "value": "ACOS(",
+    "detail": "fn"
+  },
+  {
+    "value": "ADDDATE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ADDTIME(",
+    "detail": "fn"
+  },
+  {
+    "value": "AES_DECRYPT(",
+    "detail": "fn"
+  },
+  {
+    "value": "AES_ENCRYPT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ANY_VALUE(",
+    "detail": "fn"
+  },
+  {
+    "value": "AREA(",
+    "detail": "fn"
+  },
+  {
+    "value": "ASBINARY(",
+    "detail": "fn"
+  },
+  {
+    "value": "ASCII(",
+    "detail": "fn"
+  },
+  {
+    "value": "ASIN(",
+    "detail": "fn"
+  },
+  {
+    "value": "ASTEXT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ASYNCHRONOUS_CONNECTION_FAILOVER_ADD_MANAGED(",
+    "detail": "fn"
+  },
+  {
+    "value": "ASYNCHRONOUS_CONNECTION_FAILOVER_ADD_SOURCE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ASYNCHRONOUS_CONNECTION_FAILOVER_DELETE_MANAGED(",
+    "detail": "fn"
+  },
+  {
+    "value": "ASYNCHRONOUS_CONNECTION_FAILOVER_DELETE_SOURCE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ASYNCHRONOUS_CONNECTION_FAILOVER_RESET(",
+    "detail": "fn"
+  },
+  {
+    "value": "ATAN(",
+    "detail": "fn"
+  },
+  {
+    "value": "ATAN2(",
+    "detail": "fn"
+  },
+  {
+    "value": "AVG(",
+    "detail": "fn"
+  },
+  {
+    "value": "BENCHMARK(",
+    "detail": "fn"
+  },
+  {
+    "value": "BIN(",
+    "detail": "fn"
+  },
+  {
+    "value": "BIN_TO_UUID(",
+    "detail": "fn"
+  },
+  {
+    "value": "BIT_AND(",
+    "detail": "fn"
+  },
+  {
+    "value": "BIT_COUNT(",
+    "detail": "fn"
+  },
+  {
+    "value": "BIT_LENGTH(",
+    "detail": "fn"
+  },
+  {
+    "value": "BIT_OR(",
+    "detail": "fn"
+  },
+  {
+    "value": "BIT_XOR(",
+    "detail": "fn"
+  },
+  {
+    "value": "BUFFER(",
+    "detail": "fn"
+  },
+  {
+    "value": "CAN_ACCESS_COLUMN(",
+    "detail": "fn"
+  },
+  {
+    "value": "CAN_ACCESS_DATABASE(",
+    "detail": "fn"
+  },
+  {
+    "value": "CAN_ACCESS_TABLE(",
+    "detail": "fn"
+  },
+  {
+    "value": "CAN_ACCESS_USER(",
+    "detail": "fn"
+  },
+  {
+    "value": "CAN_ACCESS_VIEW(",
+    "detail": "fn"
+  },
+  {
+    "value": "CASE(",
+    "detail": "fn"
+  },
+  {
+    "value": "CAST(",
+    "detail": "fn"
+  },
+  {
+    "value": "CEIL(",
+    "detail": "fn"
+  },
+  {
+    "value": "CEILING(",
+    "detail": "fn"
+  },
+  {
+    "value": "CENTROID(",
+    "detail": "fn"
+  },
+  {
+    "value": "CHARACTER_LENGTH(",
+    "detail": "fn"
+  },
+  {
+    "value": "CHARSET(",
+    "detail": "fn"
+  },
+  {
+    "value": "CHAR_LENGTH(",
+    "detail": "fn"
+  },
+  {
+    "value": "COALESCE(",
+    "detail": "fn"
+  },
+  {
+    "value": "COERCIBILITY(",
+    "detail": "fn"
+  },
+  {
+    "value": "COLLATION(",
+    "detail": "fn"
+  },
+  {
+    "value": "COMPRESS(",
+    "detail": "fn"
+  },
+  {
+    "value": "CONCAT(",
+    "detail": "fn"
+  },
+  {
+    "value": "CONCAT_WS(",
+    "detail": "fn"
+  },
+  {
+    "value": "CONNECTION_ID(",
+    "detail": "fn"
+  },
+  {
+    "value": "CONTAINS(",
+    "detail": "fn"
+  },
+  {
+    "value": "CONV(",
+    "detail": "fn"
+  },
+  {
+    "value": "CONVERT(",
+    "detail": "fn"
+  },
+  {
+    "value": "CONVERT_TZ(",
+    "detail": "fn"
+  },
+  {
+    "value": "CONVEXHULL(",
+    "detail": "fn"
+  },
+  {
+    "value": "COS(",
+    "detail": "fn"
+  },
+  {
+    "value": "COT(",
+    "detail": "fn"
+  },
+  {
+    "value": "COUNT(",
+    "detail": "fn"
+  },
+  {
+    "value": "CRC32(",
+    "detail": "fn"
+  },
+  {
+    "value": "CROSSES(",
+    "detail": "fn"
+  },
+  {
+    "value": "CUME_DIST(",
+    "detail": "fn"
+  },
+  {
+    "value": "CURDATE(",
+    "detail": "fn"
+  },
+  {
+    "value": "CURRENT_DATE(",
+    "detail": "fn"
+  },
+  {
+    "value": "CURRENT_ROLE(",
+    "detail": "fn"
+  },
+  {
+    "value": "CURRENT_TIME(",
+    "detail": "fn"
+  },
+  {
+    "value": "CURRENT_TIMESTAMP(",
+    "detail": "fn"
+  },
+  {
+    "value": "CURRENT_USER(",
+    "detail": "fn"
+  },
+  {
+    "value": "CURTIME(",
+    "detail": "fn"
+  },
+  {
+    "value": "DATABASE(",
+    "detail": "fn"
+  },
+  {
+    "value": "DATEDIFF(",
+    "detail": "fn"
+  },
+  {
+    "value": "DATE_ADD(",
+    "detail": "fn"
+  },
+  {
+    "value": "DATE_FORMAT(",
+    "detail": "fn"
+  },
+  {
+    "value": "DATE_SUB(",
+    "detail": "fn"
+  },
+  {
+    "value": "DAY(",
+    "detail": "fn"
+  },
+  {
+    "value": "DAYNAME(",
+    "detail": "fn"
+  },
+  {
+    "value": "DAYOFMONTH(",
+    "detail": "fn"
+  },
+  {
+    "value": "DAYOFWEEK(",
+    "detail": "fn"
+  },
+  {
+    "value": "DAYOFYEAR(",
+    "detail": "fn"
+  },
+  {
+    "value": "DECODE(",
+    "detail": "fn"
+  },
+  {
+    "value": "DEFAULT(",
+    "detail": "fn"
+  },
+  {
+    "value": "DEGREES(",
+    "detail": "fn"
+  },
+  {
+    "value": "DENSE_RANK(",
+    "detail": "fn"
+  },
+  {
+    "value": "DES_DECRYPT(",
+    "detail": "fn"
+  },
+  {
+    "value": "DES_ENCRYPT(",
+    "detail": "fn"
+  },
+  {
+    "value": "DIMENSION(",
+    "detail": "fn"
+  },
+  {
+    "value": "DISJOINT(",
+    "detail": "fn"
+  },
+  {
+    "value": "DISTANCE(",
+    "detail": "fn"
+  },
+  {
+    "value": "DIV(",
+    "detail": "fn"
+  },
+  {
+    "value": "ELT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ENCODE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ENCRYPT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ENDPOINT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ENVELOPE(",
+    "detail": "fn"
+  },
+  {
+    "value": "EQUALS(",
+    "detail": "fn"
+  },
+  {
+    "value": "EXP(",
+    "detail": "fn"
+  },
+  {
+    "value": "EXPORT_SET(",
+    "detail": "fn"
+  },
+  {
+    "value": "EXTERIORRING(",
+    "detail": "fn"
+  },
+  {
+    "value": "EXTRACT(",
+    "detail": "fn"
+  },
+  {
+    "value": "EXTRACTVALUE(",
+    "detail": "fn"
+  },
+  {
+    "value": "FIELD(",
+    "detail": "fn"
+  },
+  {
+    "value": "FIND_IN_SET(",
+    "detail": "fn"
+  },
+  {
+    "value": "FIRST_VALUE(",
+    "detail": "fn"
+  },
+  {
+    "value": "FLOOR(",
+    "detail": "fn"
+  },
+  {
+    "value": "FORMAT(",
+    "detail": "fn"
+  },
+  {
+    "value": "FORMAT_BYTES(",
+    "detail": "fn"
+  },
+  {
+    "value": "FORMAT_PICO_TIME(",
+    "detail": "fn"
+  },
+  {
+    "value": "FOUND_ROWS(",
+    "detail": "fn"
+  },
+  {
+    "value": "FROM_BASE64(",
+    "detail": "fn"
+  },
+  {
+    "value": "FROM_DAYS(",
+    "detail": "fn"
+  },
+  {
+    "value": "FROM_UNIXTIME(",
+    "detail": "fn"
+  },
+  {
+    "value": "GEOMCOLLECTION(",
+    "detail": "fn"
+  },
+  {
+    "value": "GEOMCOLLFROMTEXT(",
+    "detail": "fn"
+  },
+  {
+    "value": "GEOMCOLLFROMWKB(",
+    "detail": "fn"
+  },
+  {
+    "value": "GEOMETRYCOLLECTION(",
+    "detail": "fn"
+  },
+  {
+    "value": "GEOMETRYN(",
+    "detail": "fn"
+  },
+  {
+    "value": "GEOMETRYTYPE(",
+    "detail": "fn"
+  },
+  {
+    "value": "GEOMFROMTEXT(",
+    "detail": "fn"
+  },
+  {
+    "value": "GEOMFROMWKB(",
+    "detail": "fn"
+  },
+  {
+    "value": "GET_DD_COLUMN_PRIVILEGES(",
+    "detail": "fn"
+  },
+  {
+    "value": "GET_DD_CREATE_OPTIONS(",
+    "detail": "fn"
+  },
+  {
+    "value": "GET_DD_INDEX_SUB_PART_LENGTH(",
+    "detail": "fn"
+  },
+  {
+    "value": "GET_FORMAT(",
+    "detail": "fn"
+  },
+  {
+    "value": "GET_LOCK(",
+    "detail": "fn"
+  },
+  {
+    "value": "GLENGTH(",
+    "detail": "fn"
+  },
+  {
+    "value": "GREATEST(",
+    "detail": "fn"
+  },
+  {
+    "value": "GROUPING(",
+    "detail": "fn"
+  },
+  {
+    "value": "GROUP_CONCAT(",
+    "detail": "fn"
+  },
+  {
+    "value": "GROUP_REPLICATION_DISABLE_MEMBER_ACTION(",
+    "detail": "fn"
+  },
+  {
+    "value": "GROUP_REPLICATION_ENABLE_MEMBER_ACTION(",
+    "detail": "fn"
+  },
+  {
+    "value": "GROUP_REPLICATION_GET_COMMUNICATION_PROTOCOL(",
+    "detail": "fn"
+  },
+  {
+    "value": "GROUP_REPLICATION_GET_WRITE_CONCURRENCY(",
+    "detail": "fn"
+  },
+  {
+    "value": "GROUP_REPLICATION_RESET_MEMBER_ACTIONS(",
+    "detail": "fn"
+  },
+  {
+    "value": "GROUP_REPLICATION_SET_AS_PRIMARY(",
+    "detail": "fn"
+  },
+  {
+    "value": "GROUP_REPLICATION_SET_COMMUNICATION_PROTOCOL(",
+    "detail": "fn"
+  },
+  {
+    "value": "GROUP_REPLICATION_SET_WRITE_CONCURRENCY(",
+    "detail": "fn"
+  },
+  {
+    "value": "GROUP_REPLICATION_SWITCH_TO_MULTI_PRIMARY_MODE(",
+    "detail": "fn"
+  },
+  {
+    "value": "GROUP_REPLICATION_SWITCH_TO_SINGLE_PRIMARY_MODE(",
+    "detail": "fn"
+  },
+  {
+    "value": "GTID_SUBSET(",
+    "detail": "fn"
+  },
+  {
+    "value": "GTID_SUBTRACT(",
+    "detail": "fn"
+  },
+  {
+    "value": "HEX(",
+    "detail": "fn"
+  },
+  {
+    "value": "HOUR(",
+    "detail": "fn"
+  },
+  {
+    "value": "ICU_VERSION(",
+    "detail": "fn"
+  },
+  {
+    "value": "IF(",
+    "detail": "fn"
+  },
+  {
+    "value": "IFNULL(",
+    "detail": "fn"
+  },
+  {
+    "value": "INET6_ATON(",
+    "detail": "fn"
+  },
+  {
+    "value": "INET6_NTOA(",
+    "detail": "fn"
+  },
+  {
+    "value": "INET_ATON(",
+    "detail": "fn"
+  },
+  {
+    "value": "INET_NTOA(",
+    "detail": "fn"
+  },
+  {
+    "value": "INSERT(",
+    "detail": "fn"
+  },
+  {
+    "value": "INSTR(",
+    "detail": "fn"
+  },
+  {
+    "value": "INTERIORRINGN(",
+    "detail": "fn"
+  },
+  {
+    "value": "INTERNAL_AUTO_INCREMENT(",
+    "detail": "fn"
+  },
+  {
+    "value": "INTERNAL_AVG_ROW_LENGTH(",
+    "detail": "fn"
+  },
+  {
+    "value": "INTERNAL_CHECKSUM(",
+    "detail": "fn"
+  },
+  {
+    "value": "INTERNAL_CHECK_TIME(",
+    "detail": "fn"
+  },
+  {
+    "value": "INTERNAL_DATA_FREE(",
+    "detail": "fn"
+  },
+  {
+    "value": "INTERNAL_DATA_LENGTH(",
+    "detail": "fn"
+  },
+  {
+    "value": "INTERNAL_DD_CHAR_LENGTH(",
+    "detail": "fn"
+  },
+  {
+    "value": "INTERNAL_GET_COMMENT_OR_ERROR(",
+    "detail": "fn"
+  },
+  {
+    "value": "INTERNAL_GET_ENABLED_ROLE_JSON(",
+    "detail": "fn"
+  },
+  {
+    "value": "INTERNAL_GET_HOSTNAME(",
+    "detail": "fn"
+  },
+  {
+    "value": "INTERNAL_GET_USERNAME(",
+    "detail": "fn"
+  },
+  {
+    "value": "INTERNAL_GET_VIEW_WARNING_OR_ERROR(",
+    "detail": "fn"
+  },
+  {
+    "value": "INTERNAL_INDEX_COLUMN_CARDINALITY(",
+    "detail": "fn"
+  },
+  {
+    "value": "INTERNAL_INDEX_LENGTH(",
+    "detail": "fn"
+  },
+  {
+    "value": "INTERNAL_IS_ENABLED_ROLE(",
+    "detail": "fn"
+  },
+  {
+    "value": "INTERNAL_IS_MANDATORY_ROLE(",
+    "detail": "fn"
+  },
+  {
+    "value": "INTERNAL_KEYS_DISABLED(",
+    "detail": "fn"
+  },
+  {
+    "value": "INTERNAL_MAX_DATA_LENGTH(",
+    "detail": "fn"
+  },
+  {
+    "value": "INTERNAL_TABLE_ROWS(",
+    "detail": "fn"
+  },
+  {
+    "value": "INTERNAL_UPDATE_TIME(",
+    "detail": "fn"
+  },
+  {
+    "value": "INTERSECTS(",
+    "detail": "fn"
+  },
+  {
+    "value": "INTERVAL(",
+    "detail": "fn"
+  },
+  {
+    "value": "IS NOT NULL(",
+    "detail": "fn"
+  },
+  {
+    "value": "IS NOT(",
+    "detail": "fn"
+  },
+  {
+    "value": "IS NULL(",
+    "detail": "fn"
+  },
+  {
+    "value": "ISCLOSED(",
+    "detail": "fn"
+  },
+  {
+    "value": "ISEMPTY(",
+    "detail": "fn"
+  },
+  {
+    "value": "ISNULL(",
+    "detail": "fn"
+  },
+  {
+    "value": "ISSIMPLE(",
+    "detail": "fn"
+  },
+  {
+    "value": "IS_FREE_LOCK(",
+    "detail": "fn"
+  },
+  {
+    "value": "IS_IPV4(",
+    "detail": "fn"
+  },
+  {
+    "value": "IS_IPV4_COMPAT(",
+    "detail": "fn"
+  },
+  {
+    "value": "IS_IPV4_MAPPED(",
+    "detail": "fn"
+  },
+  {
+    "value": "IS_IPV6(",
+    "detail": "fn"
+  },
+  {
+    "value": "IS_USED_LOCK(",
+    "detail": "fn"
+  },
+  {
+    "value": "IS_UUID(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_APPEND(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_ARRAY(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_ARRAYAGG(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_ARRAY_APPEND(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_ARRAY_INSERT(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_CONTAINS(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_CONTAINS_PATH(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_DEPTH(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_EXTRACT(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_INSERT(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_KEYS(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_LENGTH(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_MERGE(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_MERGE_PATCH(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_MERGE_PRESERVE(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_OBJECT(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_OBJECTAGG(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_OVERLAPS(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_PRETTY(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_QUOTE(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_REMOVE(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_REPLACE(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_SCHEMA_VALID(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_SCHEMA_VALIDATION_REPORT(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_SEARCH(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_SET(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_STORAGE_FREE(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_STORAGE_SIZE(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_TABLE(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_TYPE(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_UNQUOTE(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_VALID(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_VALUE(",
+    "detail": "fn"
+  },
+  {
+    "value": "LAG(",
+    "detail": "fn"
+  },
+  {
+    "value": "LAST_DAY(",
+    "detail": "fn"
+  },
+  {
+    "value": "LAST_INSERT_ID(",
+    "detail": "fn"
+  },
+  {
+    "value": "LAST_VALUE(",
+    "detail": "fn"
+  },
+  {
+    "value": "LCASE(",
+    "detail": "fn"
+  },
+  {
+    "value": "LEAD(",
+    "detail": "fn"
+  },
+  {
+    "value": "LEAST(",
+    "detail": "fn"
+  },
+  {
+    "value": "LENGTH(",
+    "detail": "fn"
+  },
+  {
+    "value": "LINEFROMTEXT(",
+    "detail": "fn"
+  },
+  {
+    "value": "LINEFROMWKB(",
+    "detail": "fn"
+  },
+  {
+    "value": "LINESTRING(",
+    "detail": "fn"
+  },
+  {
+    "value": "LN(",
+    "detail": "fn"
+  },
+  {
+    "value": "LOAD_FILE(",
+    "detail": "fn"
+  },
+  {
+    "value": "LOCALTIME(",
+    "detail": "fn"
+  },
+  {
+    "value": "LOCALTIMESTAMP(",
+    "detail": "fn"
+  },
+  {
+    "value": "LOCATE(",
+    "detail": "fn"
+  },
+  {
+    "value": "LOG(",
+    "detail": "fn"
+  },
+  {
+    "value": "LOG10(",
+    "detail": "fn"
+  },
+  {
+    "value": "LOG2(",
+    "detail": "fn"
+  },
+  {
+    "value": "LOWER(",
+    "detail": "fn"
+  },
+  {
+    "value": "LPAD(",
+    "detail": "fn"
+  },
+  {
+    "value": "LTRIM(",
+    "detail": "fn"
+  },
+  {
+    "value": "MAKEDATE(",
+    "detail": "fn"
+  },
+  {
+    "value": "MAKETIME(",
+    "detail": "fn"
+  },
+  {
+    "value": "MAKE_SET(",
+    "detail": "fn"
+  },
+  {
+    "value": "MASTER_POS_WAIT(",
+    "detail": "fn"
+  },
+  {
+    "value": "MATCH(",
+    "detail": "fn"
+  },
+  {
+    "value": "MAX(",
+    "detail": "fn"
+  },
+  {
+    "value": "MBRCONTAINS(",
+    "detail": "fn"
+  },
+  {
+    "value": "MBRCOVEREDBY(",
+    "detail": "fn"
+  },
+  {
+    "value": "MBRCOVERS(",
+    "detail": "fn"
+  },
+  {
+    "value": "MBRDISJOINT(",
+    "detail": "fn"
+  },
+  {
+    "value": "MBREQUAL(",
+    "detail": "fn"
+  },
+  {
+    "value": "MBREQUALS(",
+    "detail": "fn"
+  },
+  {
+    "value": "MBRINTERSECTS(",
+    "detail": "fn"
+  },
+  {
+    "value": "MBROVERLAPS(",
+    "detail": "fn"
+  },
+  {
+    "value": "MBRTOUCHES(",
+    "detail": "fn"
+  },
+  {
+    "value": "MBRWITHIN(",
+    "detail": "fn"
+  },
+  {
+    "value": "MD5(",
+    "detail": "fn"
+  },
+  {
+    "value": "MEMBER OF(",
+    "detail": "fn"
+  },
+  {
+    "value": "MEMBER(",
+    "detail": "fn"
+  },
+  {
+    "value": "MICROSECOND(",
+    "detail": "fn"
+  },
+  {
+    "value": "MID(",
+    "detail": "fn"
+  },
+  {
+    "value": "MIN(",
+    "detail": "fn"
+  },
+  {
+    "value": "MINUTE(",
+    "detail": "fn"
+  },
+  {
+    "value": "MLINEFROMTEXT(",
+    "detail": "fn"
+  },
+  {
+    "value": "MLINEFROMWKB(",
+    "detail": "fn"
+  },
+  {
+    "value": "MOD(",
+    "detail": "fn"
+  },
+  {
+    "value": "MONTH(",
+    "detail": "fn"
+  },
+  {
+    "value": "MONTHNAME(",
+    "detail": "fn"
+  },
+  {
+    "value": "MPOINTFROMTEXT(",
+    "detail": "fn"
+  },
+  {
+    "value": "MPOINTFROMWKB(",
+    "detail": "fn"
+  },
+  {
+    "value": "MPOLYFROMTEXT(",
+    "detail": "fn"
+  },
+  {
+    "value": "MPOLYFROMWKB(",
+    "detail": "fn"
+  },
+  {
+    "value": "MULTILINESTRING(",
+    "detail": "fn"
+  },
+  {
+    "value": "MULTIPOINT(",
+    "detail": "fn"
+  },
+  {
+    "value": "MULTIPOLYGON(",
+    "detail": "fn"
+  },
+  {
+    "value": "NAME_CONST(",
+    "detail": "fn"
+  },
+  {
+    "value": "NOT IN(",
+    "detail": "fn"
+  },
+  {
+    "value": "NOT LIKE(",
+    "detail": "fn"
+  },
+  {
+    "value": "NOT REGEXP(",
+    "detail": "fn"
+  },
+  {
+    "value": "NOW(",
+    "detail": "fn"
+  },
+  {
+    "value": "NTH_VALUE(",
+    "detail": "fn"
+  },
+  {
+    "value": "NTILE(",
+    "detail": "fn"
+  },
+  {
+    "value": "NULLIF(",
+    "detail": "fn"
+  },
+  {
+    "value": "NUMGEOMETRIES(",
+    "detail": "fn"
+  },
+  {
+    "value": "NUMINTERIORRINGS(",
+    "detail": "fn"
+  },
+  {
+    "value": "NUMPOINTS(",
+    "detail": "fn"
+  },
+  {
+    "value": "OCT(",
+    "detail": "fn"
+  },
+  {
+    "value": "OCTET_LENGTH(",
+    "detail": "fn"
+  },
+  {
+    "value": "ORD(",
+    "detail": "fn"
+  },
+  {
+    "value": "OVERLAPS(",
+    "detail": "fn"
+  },
+  {
+    "value": "PASSWORD(",
+    "detail": "fn"
+  },
+  {
+    "value": "PERCENT_RANK(",
+    "detail": "fn"
+  },
+  {
+    "value": "PERIOD_ADD(",
+    "detail": "fn"
+  },
+  {
+    "value": "PERIOD_DIFF(",
+    "detail": "fn"
+  },
+  {
+    "value": "PI(",
+    "detail": "fn"
+  },
+  {
+    "value": "POINT(",
+    "detail": "fn"
+  },
+  {
+    "value": "POINTFROMTEXT(",
+    "detail": "fn"
+  },
+  {
+    "value": "POINTFROMWKB(",
+    "detail": "fn"
+  },
+  {
+    "value": "POINTN(",
+    "detail": "fn"
+  },
+  {
+    "value": "POLYFROMTEXT(",
+    "detail": "fn"
+  },
+  {
+    "value": "POLYFROMWKB(",
+    "detail": "fn"
+  },
+  {
+    "value": "POLYGON(",
+    "detail": "fn"
+  },
+  {
+    "value": "POSITION(",
+    "detail": "fn"
+  },
+  {
+    "value": "POW(",
+    "detail": "fn"
+  },
+  {
+    "value": "POWER(",
+    "detail": "fn"
+  },
+  {
+    "value": "PROCEDURE ANALYSE(",
+    "detail": "fn"
+  },
+  {
+    "value": "PS_CURRENT_THREAD_ID(",
+    "detail": "fn"
+  },
+  {
+    "value": "PS_THREAD_ID(",
+    "detail": "fn"
+  },
+  {
+    "value": "QUARTER(",
+    "detail": "fn"
+  },
+  {
+    "value": "QUOTE(",
+    "detail": "fn"
+  },
+  {
+    "value": "RADIANS(",
+    "detail": "fn"
+  },
+  {
+    "value": "RAND(",
+    "detail": "fn"
+  },
+  {
+    "value": "RANDOM_BYTES(",
+    "detail": "fn"
+  },
+  {
+    "value": "RANK(",
+    "detail": "fn"
+  },
+  {
+    "value": "REGEXP_INSTR(",
+    "detail": "fn"
+  },
+  {
+    "value": "REGEXP_LIKE(",
+    "detail": "fn"
+  },
+  {
+    "value": "REGEXP_REPLACE(",
+    "detail": "fn"
+  },
+  {
+    "value": "REGEXP_SUBSTR(",
+    "detail": "fn"
+  },
+  {
+    "value": "RELEASE_ALL_LOCKS(",
+    "detail": "fn"
+  },
+  {
+    "value": "RELEASE_LOCK(",
+    "detail": "fn"
+  },
+  {
+    "value": "REPEAT(",
+    "detail": "fn"
+  },
+  {
+    "value": "REPLACE(",
+    "detail": "fn"
+  },
+  {
+    "value": "REVERSE(",
+    "detail": "fn"
+  },
+  {
+    "value": "RLIKE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ROLES_GRAPHML(",
+    "detail": "fn"
+  },
+  {
+    "value": "ROUND(",
+    "detail": "fn"
+  },
+  {
+    "value": "ROW_COUNT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ROW_NUMBER(",
+    "detail": "fn"
+  },
+  {
+    "value": "RPAD(",
+    "detail": "fn"
+  },
+  {
+    "value": "RTRIM(",
+    "detail": "fn"
+  },
+  {
+    "value": "SCHEMA(",
+    "detail": "fn"
+  },
+  {
+    "value": "SECOND(",
+    "detail": "fn"
+  },
+  {
+    "value": "SEC_TO_TIME(",
+    "detail": "fn"
+  },
+  {
+    "value": "SESSION_USER(",
+    "detail": "fn"
+  },
+  {
+    "value": "SHA1(",
+    "detail": "fn"
+  },
+  {
+    "value": "SHA2(",
+    "detail": "fn"
+  },
+  {
+    "value": "SIGN(",
+    "detail": "fn"
+  },
+  {
+    "value": "SIN(",
+    "detail": "fn"
+  },
+  {
+    "value": "SLEEP(",
+    "detail": "fn"
+  },
+  {
+    "value": "SOUNDEX(",
+    "detail": "fn"
+  },
+  {
+    "value": "SOUNDS LIKE(",
+    "detail": "fn"
+  },
+  {
+    "value": "SOURCE_POS_WAIT(",
+    "detail": "fn"
+  },
+  {
+    "value": "SPACE(",
+    "detail": "fn"
+  },
+  {
+    "value": "SQRT(",
+    "detail": "fn"
+  },
+  {
+    "value": "SRID(",
+    "detail": "fn"
+  },
+  {
+    "value": "STARTPOINT(",
+    "detail": "fn"
+  },
+  {
+    "value": "STATEMENT_DIGEST(",
+    "detail": "fn"
+  },
+  {
+    "value": "STATEMENT_DIGEST_TEXT(",
+    "detail": "fn"
+  },
+  {
+    "value": "STD(",
+    "detail": "fn"
+  },
+  {
+    "value": "STDDEV(",
+    "detail": "fn"
+  },
+  {
+    "value": "STDDEV_POP(",
+    "detail": "fn"
+  },
+  {
+    "value": "STDDEV_SAMP(",
+    "detail": "fn"
+  },
+  {
+    "value": "STRCMP(",
+    "detail": "fn"
+  },
+  {
+    "value": "STR_TO_DATE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_AREA(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_ASBINARY(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_ASGEOJSON(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_ASTEXT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_BUFFER(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_BUFFER_STRATEGY(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_CENTROID(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_COLLECT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_CONTAINS(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_CONVEXHULL(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_CROSSES(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_DIFFERENCE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_DIMENSION(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_DISJOINT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_DISTANCE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_DISTANCE_SPHERE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_ENDPOINT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_ENVELOPE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_EQUALS(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_EXTERIORRING(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_FRECHETDISTANCE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_GEOHASH(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_GEOMCOLLFROMTEXT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_GEOMCOLLFROMWKB(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_GEOMETRYN(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_GEOMETRYTYPE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_GEOMFROMGEOJSON(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_GEOMFROMTEXT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_GEOMFROMWKB(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_HAUSDORFFDISTANCE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_INTERIORRINGN(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_INTERSECTION(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_INTERSECTS(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_ISCLOSED(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_ISEMPTY(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_ISSIMPLE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_ISVALID(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_LATFROMGEOHASH(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_LATITUDE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_LENGTH(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_LINEFROMTEXT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_LINEFROMWKB(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_LINEINTERPOLATEPOINT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_LINEINTERPOLATEPOINTS(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_LONGFROMGEOHASH(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_LONGITUDE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_MAKEENVELOPE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_MLINEFROMTEXT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_MLINEFROMWKB(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_MPOINTFROMTEXT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_MPOINTFROMWKB(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_MPOLYFROMTEXT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_MPOLYFROMWKB(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_NUMGEOMETRIES(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_NUMINTERIORRING(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_NUMPOINTS(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_OVERLAPS(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_POINTATDISTANCE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_POINTFROMGEOHASH(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_POINTFROMTEXT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_POINTFROMWKB(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_POINTN(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_POLYFROMTEXT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_POLYFROMWKB(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_SIMPLIFY(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_SRID(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_STARTPOINT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_SWAPXY(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_SYMDIFFERENCE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_TOUCHES(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_TRANSFORM(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_UNION(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_VALIDATE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_WITHIN(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_X(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_Y(",
+    "detail": "fn"
+  },
+  {
+    "value": "SUBDATE(",
+    "detail": "fn"
+  },
+  {
+    "value": "SUBSTR(",
+    "detail": "fn"
+  },
+  {
+    "value": "SUBSTRING(",
+    "detail": "fn"
+  },
+  {
+    "value": "SUBSTRING_INDEX(",
+    "detail": "fn"
+  },
+  {
+    "value": "SUBTIME(",
+    "detail": "fn"
+  },
+  {
+    "value": "SUM(",
+    "detail": "fn"
+  },
+  {
+    "value": "SYSDATE(",
+    "detail": "fn"
+  },
+  {
+    "value": "SYSTEM_USER(",
+    "detail": "fn"
+  },
+  {
+    "value": "TAN(",
+    "detail": "fn"
+  },
+  {
+    "value": "TIMEDIFF(",
+    "detail": "fn"
+  },
+  {
+    "value": "TIMESTAMPADD(",
+    "detail": "fn"
+  },
+  {
+    "value": "TIMESTAMPDIFF(",
+    "detail": "fn"
+  },
+  {
+    "value": "TIME_FORMAT(",
+    "detail": "fn"
+  },
+  {
+    "value": "TIME_TO_SEC(",
+    "detail": "fn"
+  },
+  {
+    "value": "TOUCHES(",
+    "detail": "fn"
+  },
+  {
+    "value": "TO_BASE64(",
+    "detail": "fn"
+  },
+  {
+    "value": "TO_DAYS(",
+    "detail": "fn"
+  },
+  {
+    "value": "TO_SECONDS(",
+    "detail": "fn"
+  },
+  {
+    "value": "TRIM(",
+    "detail": "fn"
+  },
+  {
+    "value": "TRUNCATE(",
+    "detail": "fn"
+  },
+  {
+    "value": "UCASE(",
+    "detail": "fn"
+  },
+  {
+    "value": "UNCOMPRESS(",
+    "detail": "fn"
+  },
+  {
+    "value": "UNCOMPRESSED_LENGTH(",
+    "detail": "fn"
+  },
+  {
+    "value": "UNHEX(",
+    "detail": "fn"
+  },
+  {
+    "value": "UNIX_TIMESTAMP(",
+    "detail": "fn"
+  },
+  {
+    "value": "UPDATEXML(",
+    "detail": "fn"
+  },
+  {
+    "value": "UPPER(",
+    "detail": "fn"
+  },
+  {
+    "value": "USER(",
+    "detail": "fn"
+  },
+  {
+    "value": "UTC_DATE(",
+    "detail": "fn"
+  },
+  {
+    "value": "UTC_TIME(",
+    "detail": "fn"
+  },
+  {
+    "value": "UTC_TIMESTAMP(",
+    "detail": "fn"
+  },
+  {
+    "value": "UUID(",
+    "detail": "fn"
+  },
+  {
+    "value": "UUID_SHORT(",
+    "detail": "fn"
+  },
+  {
+    "value": "UUID_TO_BIN(",
+    "detail": "fn"
+  },
+  {
+    "value": "VALIDATE_PASSWORD_STRENGTH(",
+    "detail": "fn"
+  },
+  {
+    "value": "VALUES(",
+    "detail": "fn"
+  },
+  {
+    "value": "VARIANCE(",
+    "detail": "fn"
+  },
+  {
+    "value": "VAR_POP(",
+    "detail": "fn"
+  },
+  {
+    "value": "VAR_SAMP(",
+    "detail": "fn"
+  },
+  {
+    "value": "VERSION(",
+    "detail": "fn"
+  },
+  {
+    "value": "WAIT_FOR_EXECUTED_GTID_SET(",
+    "detail": "fn"
+  },
+  {
+    "value": "WAIT_UNTIL_SQL_THREAD_AFTER_GTIDS(",
+    "detail": "fn"
+  },
+  {
+    "value": "WEEK(",
+    "detail": "fn"
+  },
+  {
+    "value": "WEEKDAY(",
+    "detail": "fn"
+  },
+  {
+    "value": "WEEKOFYEAR(",
+    "detail": "fn"
+  },
+  {
+    "value": "WEIGHT_STRING(",
+    "detail": "fn"
+  },
+  {
+    "value": "WITHIN(",
+    "detail": "fn"
+  },
+  {
+    "value": "X(",
+    "detail": "fn"
+  },
+  {
+    "value": "XOR(",
+    "detail": "fn"
+  },
+  {
+    "value": "Y(",
+    "detail": "fn"
+  },
+  {
+    "value": "YEARWEEK(",
+    "detail": "fn"
+  }
+]

@@ -102,6 +102,8 @@ type Model struct {
 	redisCursor         uint64
 	redisPattern        string
 	historyIndex        int
+	queryTimeout        time.Duration      // 0 = no timeout (Esc to cancel)
+	cancelOp            context.CancelFunc // cancels the in-flight async op
 	cursorBlinkOn       bool
 	pending             *pendingAction
 	loading             loadingState
@@ -144,6 +146,7 @@ func NewModel(options Options) *Model {
 		redisPattern:  "*",
 		cursorBlinkOn: true,
 		activeSession: -1,
+		queryTimeout:  defaultQueryTimeout,
 	}
 }
 
@@ -180,6 +183,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.page == PageUnlock {
 			if cmd, handled := m.handleUnlockKey(msg); handled {
 				return m, cmd
+			}
+		}
+		// While an async DB op runs, Esc aborts it (only the ":q" command quits).
+		if m.loading.active && msg.String() == "esc" {
+			if m.cancelActiveOp() {
+				return m, nil
 			}
 		}
 		// Connection-tab switching (Alt+arrows / Alt+digits) works from anywhere.
@@ -647,12 +656,36 @@ func (m *Model) handleGlobalCommand(ctx context.Context, line string) bool {
 		m.runPageAction(ctx, actionRefresh)
 	case "back":
 		m.back()
+	case "export":
+		m.exportResult(parts[1:])
+	case "copy":
+		m.copyResultAs(parts[1:])
+	case "timeout":
+		if len(parts) < 2 {
+			m.message = fmt.Sprintf("query timeout: %s (0 = none, Esc to cancel)", m.queryTimeout)
+			return true
+		}
+		secs, err := strconv.Atoi(parts[1])
+		if err != nil || secs < 0 {
+			m.message = "usage: timeout <seconds>  (0 = no timeout)"
+			return true
+		}
+		m.queryTimeout = time.Duration(secs) * time.Second
+		if secs == 0 {
+			m.message = "query timeout disabled (Esc to cancel)"
+		} else {
+			m.message = fmt.Sprintf("query timeout set to %ds", secs)
+		}
 	case "q", "quit", "exit":
 		// The only way to exit the program. takeCmd() forwards this to Bubble Tea
 		// after HandleLine returns.
 		m.nextCmd = tea.Quit
 		m.message = "bye"
-	case "db", "next", "/":
+	case "next":
+		m.pageNext(ctx)
+	case "prev", "previous":
+		m.pagePrev(ctx)
+	case "db", "/":
 		m.handleBrowser(ctx, line)
 	default:
 		return false
@@ -953,7 +986,7 @@ func (m *Model) testProfile(ctx context.Context, id string) {
 		return
 	}
 	defer adapter.Close()
-	ctx, cancel := dbContext(ctx)
+	ctx, cancel := m.dbContext(ctx)
 	defer cancel()
 	if err := adapter.Test(ctx); err != nil {
 		m.message = "test failed: " + err.Error()
@@ -1072,7 +1105,7 @@ func (m *Model) handleQuery(ctx context.Context, line string) {
 		return
 	}
 	start := time.Now()
-	opCtx, cancel := dbContext(ctx)
+	opCtx, cancel := m.dbContext(ctx)
 	defer cancel()
 	res, err := m.adapter.Execute(opCtx, db.Command{Text: line, Database: m.selectedDB})
 	status := history.StatusOK
@@ -1154,7 +1187,7 @@ func (m *Model) runMutation(ctx context.Context, pending *pendingAction, action 
 	start := time.Now()
 	var mutation result.MutationResult
 	var err error
-	opCtx, cancel := dbContext(ctx)
+	opCtx, cancel := m.dbContext(ctx)
 	switch action {
 	case history.ActionInsert:
 		mutation, err = m.adapter.Insert(opCtx, pending.Target, pending.Values)
@@ -1283,7 +1316,7 @@ func (m *Model) nextRedisScan(ctx context.Context) {
 		m.message = "next is only available for redis scans"
 		return
 	}
-	ctx, cancel := dbContext(ctx)
+	ctx, cancel := m.dbContext(ctx)
 	defer cancel()
 	scan, err := scanner.ScanKeys(ctx, redisadapter.ScanRequest{Cursor: m.redisCursor, Pattern: m.redisPattern, Count: 100})
 	if err != nil {
@@ -1343,13 +1376,17 @@ func (m *Model) saveVault(okMessage string) {
 	m.message = okMessage
 }
 
-// dbTimeout bounds how long a synchronous database operation may block the UI
-// event loop. Bubble Tea calls Update on a single goroutine, so a hung adapter
-// call would otherwise freeze the whole TUI.
-const dbTimeout = 30 * time.Second
+// defaultQueryTimeout bounds how long a database operation may run before it is
+// aborted. It is configurable at runtime via ":timeout <seconds>" (0 = no
+// timeout, rely on Esc to cancel).
+const defaultQueryTimeout = 30 * time.Second
 
-func dbContext(parent context.Context) (context.Context, context.CancelFunc) {
-	return context.WithTimeout(parent, dbTimeout)
+// dbContext derives a context honoring the configured query timeout (0 = none).
+func (m *Model) dbContext(parent context.Context) (context.Context, context.CancelFunc) {
+	if m.queryTimeout <= 0 {
+		return context.WithCancel(parent)
+	}
+	return context.WithTimeout(parent, m.queryTimeout)
 }
 
 func (m *Model) recordHistory(entry history.Entry) {

@@ -56,6 +56,19 @@ func (m *Model) handleWorkspaceVimKey(ctx context.Context, msg tea.KeyMsg) bool 
 
 func (m *Model) handleQueryTabKey(ctx context.Context, tab *workspaceTab, msg tea.KeyMsg) bool {
 	ensureQueryTabState(tab)
+	// Ctrl+C clears the query input when it has content (it never quits — only
+	// ":q" does). An empty buffer swallows the key so nothing else acts on it.
+	if msg.String() == "ctrl+c" {
+		if tab.QueryBuffer != "" {
+			pushQueryUndo(tab)
+			tab.QueryBuffer = ""
+			tab.QueryCursor = 0
+			tab.QuerySuggestionsVisible = false
+			tab.QueryHistoryIndex = -1
+			m.message = "query cleared"
+		}
+		return true
+	}
 	if tab.RowDetail {
 		return m.handleRowDetailKey(tab, msg)
 	}
@@ -297,6 +310,8 @@ func (m *Model) ensureDataTabState(tab *workspaceTab) {
 }
 
 func (m *Model) handleDataNormalKey(tab *workspaceTab, msg tea.KeyMsg) bool {
+	prevG := tab.ResultPendingG
+	tab.ResultPendingG = false
 	switch msg.String() {
 	case "v":
 		tab.VimMode = vimModeVisual
@@ -306,6 +321,14 @@ func (m *Model) handleDataNormalKey(tab *workspaceTab, msg tea.KeyMsg) bool {
 		tab.ResultAnchorRow = tab.ResultRow
 		tab.ResultAnchorColumn = tab.ResultColumn
 		m.copyText(m.dataSelectionText(tab))
+	case "g":
+		if prevG {
+			m.moveDataCursor(tab, -1<<30, 0)
+		} else {
+			tab.ResultPendingG = true
+		}
+	case "G":
+		m.moveDataCursor(tab, 1<<30, 0)
 	case "j", "down":
 		m.moveDataCursor(tab, 1, 0)
 	case "k", "up":
@@ -318,6 +341,10 @@ func (m *Model) handleDataNormalKey(tab *workspaceTab, msg tea.KeyMsg) bool {
 		m.moveDataCursor(tab, m.dataViewportHeight(tab), 0)
 	case "pgup":
 		m.moveDataCursor(tab, -m.dataViewportHeight(tab), 0)
+	case "]":
+		m.pageData(1)
+	case "[":
+		m.pageData(-1)
 	default:
 		return m.handleDataMotionKey(tab, msg.String())
 	}
@@ -325,12 +352,22 @@ func (m *Model) handleDataNormalKey(tab *workspaceTab, msg tea.KeyMsg) bool {
 }
 
 func (m *Model) handleDataVisualKey(tab *workspaceTab, msg tea.KeyMsg) bool {
+	prevG := tab.ResultPendingG
+	tab.ResultPendingG = false
 	switch msg.String() {
 	case "esc":
 		tab.VimMode = vimModeNormal
 	case "y":
 		m.copyText(m.dataSelectionText(tab))
 		tab.VimMode = vimModeNormal
+	case "g":
+		if prevG {
+			m.moveDataCursor(tab, -1<<30, 0)
+		} else {
+			tab.ResultPendingG = true
+		}
+	case "G":
+		m.moveDataCursor(tab, 1<<30, 0)
 	case "j", "down":
 		m.moveDataCursor(tab, 1, 0)
 	case "k", "up":
@@ -537,6 +574,75 @@ func (m *Model) copyText(text string) {
 
 func (m *Model) handleQueryResultKey(tab *workspaceTab, msg tea.KeyMsg) bool {
 	selectable := tab.Result.Table != nil && len(tab.Result.Table.Rows) > 0
+	// Non-table results (e.g. a Redis scalar / JSON value) have no rows to select
+	// by, so they reuse the data grid's char-level cursor / visual / copy machinery
+	// — exactly like the row-detail subpage. This gives every driver a working
+	// v → select → y on its result page.
+	if hasResultSet(tab.Result) && !selectable {
+		m.clampDataCursor(tab)
+		if tab.VimMode == vimModeVisual {
+			return m.handleDataVisualKey(tab, msg)
+		}
+		switch msg.String() {
+		case "ctrl+s":
+			m.openQueryHistorySearchModal()
+			return true
+		case "ctrl+d":
+			m.openDatabasePickerModal()
+			return true
+		case "i":
+			tab.WorkspaceFocus = workspaceFocusEditor
+			tab.VimMode = vimModeInsert
+			return true
+		}
+		return m.handleDataNormalKey(tab, msg)
+	}
+
+	// Table result list: vim-like row-visual ("copy mode"). Press v to start a
+	// row selection, j/k to extend it, y to copy the selected rows (TSV).
+	if selectable && tab.VimMode == vimModeVisual {
+		prevG := tab.ResultPendingG
+		tab.ResultPendingG = false
+		switch msg.String() {
+		case "esc":
+			tab.VimMode = vimModeNormal
+		case "y":
+			m.copyText(m.queryResultSelectionText(tab))
+			tab.VimMode = vimModeNormal
+		case "g":
+			if prevG {
+				m.moveQueryResultSelection(tab, -1<<30)
+			} else {
+				tab.ResultPendingG = true
+			}
+		case "G":
+			m.moveQueryResultSelection(tab, 1<<30)
+		case "j", "down":
+			m.moveQueryResultSelection(tab, 1)
+		case "k", "up":
+			m.moveQueryResultSelection(tab, -1)
+		case "pgdown":
+			m.moveQueryResultSelection(tab, m.queryResultViewportHeight(tab))
+		case "pgup":
+			m.moveQueryResultSelection(tab, -m.queryResultViewportHeight(tab))
+		case "h", "left":
+			tab.ResultView.ScrollColumns(-1, resultSetColumnCount(tab.Result))
+			m.syncActiveTabState()
+		case "l", "right":
+			tab.ResultView.ScrollColumns(1, resultSetColumnCount(tab.Result))
+			m.syncActiveTabState()
+		case "i":
+			tab.VimMode = vimModeNormal
+			tab.WorkspaceFocus = workspaceFocusEditor
+			tab.VimMode = vimModeInsert
+		default:
+			return true // swallow other keys while in visual mode
+		}
+		return true
+	}
+
+	prevG := tab.ResultPendingG
+	tab.ResultPendingG = false
 	switch msg.String() {
 	case "ctrl+s":
 		m.openQueryHistorySearchModal()
@@ -545,6 +651,29 @@ func (m *Model) handleQueryResultKey(tab *workspaceTab, msg tea.KeyMsg) bool {
 	case "i":
 		tab.WorkspaceFocus = workspaceFocusEditor
 		tab.VimMode = vimModeInsert
+	case "v":
+		if selectable {
+			tab.VimMode = vimModeVisual
+			tab.ResultCursorAnchor = tab.ResultCursorRow
+			m.syncActiveTabState()
+		}
+	case "y":
+		if selectable {
+			tab.ResultCursorAnchor = tab.ResultCursorRow
+			m.copyText(m.queryResultSelectionText(tab))
+		}
+	case "g":
+		if selectable {
+			if prevG {
+				m.moveQueryResultSelection(tab, -1<<30)
+			} else {
+				tab.ResultPendingG = true
+			}
+		}
+	case "G":
+		if selectable {
+			m.moveQueryResultSelection(tab, 1<<30)
+		}
 	case "enter":
 		if selectable {
 			m.openRowDetail(tab)
@@ -587,6 +716,40 @@ func (m *Model) handleQueryResultKey(tab *workspaceTab, msg tea.KeyMsg) bool {
 		return false
 	}
 	return true
+}
+
+// queryResultSelectionRows returns the ordered [start, end] row range currently
+// selected in the table result list's row-visual mode.
+func (m *Model) queryResultSelectionRows(tab *workspaceTab) (int, int) {
+	start, end := tab.ResultCursorAnchor, tab.ResultCursorRow
+	if start > end {
+		start, end = end, start
+	}
+	if tab.Result.Table != nil {
+		n := len(tab.Result.Table.Rows)
+		start = clamp(start, 0, max(0, n-1))
+		end = clamp(end, 0, max(0, n-1))
+	}
+	return start, end
+}
+
+// queryResultSelectionText renders the selected rows as TSV (tab-separated
+// columns, newline-separated rows) so it pastes cleanly into a spreadsheet.
+func (m *Model) queryResultSelectionText(tab *workspaceTab) string {
+	t := tab.Result.Table
+	if t == nil || len(t.Rows) == 0 {
+		return ""
+	}
+	start, end := m.queryResultSelectionRows(tab)
+	rows := make([]string, 0, end-start+1)
+	for row := start; row <= end; row++ {
+		cells := make([]string, len(t.Columns))
+		for col := range t.Columns {
+			cells[col] = t.CellString(row, col)
+		}
+		rows = append(rows, strings.Join(cells, "\t"))
+	}
+	return strings.Join(rows, "\n")
 }
 
 // moveQueryResultSelection moves the selected row in the query result list and
@@ -900,9 +1063,30 @@ func (m *Model) querySuggestionObjects(database string) []string {
 	return names
 }
 
+// knownDatabaseObject reports whether name is a table/collection we have already
+// loaded for the database (case-insensitive).
+func (m *Model) knownDatabaseObject(database, name string) bool {
+	name = strings.ToLower(strings.TrimSpace(name))
+	if name == "" {
+		return false
+	}
+	for _, object := range m.querySuggestionObjects(database) {
+		if strings.ToLower(object) == name {
+			return true
+		}
+	}
+	return false
+}
+
 func (m *Model) querySuggestionFields(database, input string) []suggest.Field {
 	target, ok := m.querySuggestionTarget(database, input)
 	if !ok {
+		return nil
+	}
+	// Only fetch metadata for tables/collections we already know exist. This
+	// avoids probing partial identifiers while typing/deleting (e.g. "d") which
+	// would spam "Unknown table" errors and block the UI on every keystroke.
+	if !m.knownDatabaseObject(database, target.Name) {
 		return nil
 	}
 	key := strings.Join([]string{string(m.activeDriver()), target.Database, target.Name}, "\x00")
@@ -916,11 +1100,13 @@ func (m *Model) querySuggestionFields(database, input string) []suggest.Field {
 	if !ok {
 		return nil
 	}
-	ctx, cancel := dbContext(context.Background())
+	ctx, cancel := m.dbContext(context.Background())
 	defer cancel()
 	metadata, err := provider.Metadata(ctx, target)
 	if err != nil {
-		m.message = "metadata: " + err.Error()
+		// Suggestion metadata is best-effort: cache the miss and stay silent so a
+		// failed probe never overwrites the status line.
+		m.queryFieldCache[key] = nil
 		return nil
 	}
 	fields := make([]suggest.Field, 0, len(metadata.Fields))

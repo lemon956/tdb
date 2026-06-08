@@ -1,0 +1,3110 @@
+[
+  {
+    "value": "ABS(",
+    "detail": "fn"
+  },
+  {
+    "value": "ACOS(",
+    "detail": "fn"
+  },
+  {
+    "value": "ACOSH(",
+    "detail": "fn"
+  },
+  {
+    "value": "ADDDATE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ADD_MONTHS(",
+    "detail": "fn"
+  },
+  {
+    "value": "ADD_TIME(",
+    "detail": "fn"
+  },
+  {
+    "value": "AES_DECRYPT(",
+    "detail": "fn"
+  },
+  {
+    "value": "AES_ENCRYPT(",
+    "detail": "fn"
+  },
+  {
+    "value": "AI_AGG(",
+    "detail": "fn"
+  },
+  {
+    "value": "AI_CLASSIFY(",
+    "detail": "fn"
+  },
+  {
+    "value": "AI_EXTRACT(",
+    "detail": "fn"
+  },
+  {
+    "value": "AI_FILTER(",
+    "detail": "fn"
+  },
+  {
+    "value": "AI_FIXGRAMMAR(",
+    "detail": "fn"
+  },
+  {
+    "value": "AI_GENERATE(",
+    "detail": "fn"
+  },
+  {
+    "value": "AI_MASK(",
+    "detail": "fn"
+  },
+  {
+    "value": "AI_SENTIMENT(",
+    "detail": "fn"
+  },
+  {
+    "value": "AI_SIMILARITY(",
+    "detail": "fn"
+  },
+  {
+    "value": "AI_SUMMARIZE(",
+    "detail": "fn"
+  },
+  {
+    "value": "AI_TRANSLATE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ANY(",
+    "detail": "fn"
+  },
+  {
+    "value": "ANY_VALUE(",
+    "detail": "fn"
+  },
+  {
+    "value": "APPEND_TRAILING_CHAR_IF_ABSENT(",
+    "detail": "fn"
+  },
+  {
+    "value": "APPROX_COUNT_DISTINCT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAYS_OVERLAP(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_AGG(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_APPEND(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_APPLY(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_AVG(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_COMPACT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_CONCAT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_CONTAINS(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_CONTAINS_ALL(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_COUNT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_CROSS_PRODUCT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_CUM_SUM(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_DIFFERENCE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_DISTINCT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_ENUMERATE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_ENUMERATE_UNIQ(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_EXCEPT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_EXISTS(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_FILTER(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_FIRST(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_FIRST_INDEX(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_FLATTEN(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_INTERSECT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_JOIN(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_LAST(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_LAST_INDEX(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_MAP(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_MATCH_ALL(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_MATCH_ANY(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_MAX(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_MIN(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_POPBACK(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_POPFRONT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_POSITION(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_PRODUCT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_RANGE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_REMOVE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_REPEAT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_REVERSE_SORT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_REVERSE_SPLIT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_SHUFFLE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_SIZE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_SLICE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_SORT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_SORTBY(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_SPLIT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_SUM(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_UNION(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_WITH_CONSTANT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ARRAY_ZIP(",
+    "detail": "fn"
+  },
+  {
+    "value": "ASCII(",
+    "detail": "fn"
+  },
+  {
+    "value": "ASIN(",
+    "detail": "fn"
+  },
+  {
+    "value": "ASINH(",
+    "detail": "fn"
+  },
+  {
+    "value": "ASSERT_TRUE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ATAN(",
+    "detail": "fn"
+  },
+  {
+    "value": "ATAN2(",
+    "detail": "fn"
+  },
+  {
+    "value": "ATANH(",
+    "detail": "fn"
+  },
+  {
+    "value": "AUTO_PARTITION_NAME(",
+    "detail": "fn"
+  },
+  {
+    "value": "AVG(",
+    "detail": "fn"
+  },
+  {
+    "value": "AVG_WEIGHTED(",
+    "detail": "fn"
+  },
+  {
+    "value": "BACKENDS(",
+    "detail": "fn"
+  },
+  {
+    "value": "BIN(",
+    "detail": "fn"
+  },
+  {
+    "value": "BINLOG(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_AGG(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_AND(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_ANDNOT(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_ANDNOT_COUNT(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_AND_COUNT(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_AND_NOT(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_AND_NOT_COUNT(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_CONTAINS(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_COUNT(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_EMPTY(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_FROM_ARRAY(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_FROM_BASE64(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_FROM_STRING(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_HASH(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_HASH64(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_HAS_ALL(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_HAS_ANY(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_INTERSECT(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_MAX(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_MIN(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_NOT(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_OR(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_OR_COUNT(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_REMOVE(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_SUBSET_IN_RANGE(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_SUBSET_LIMIT(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_TO_ARRAY(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_TO_BASE64(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_TO_STRING(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_UNION(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_UNION_COUNT(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_UNION_INT(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_XOR(",
+    "detail": "fn"
+  },
+  {
+    "value": "BITMAP_XOR_COUNT(",
+    "detail": "fn"
+  },
+  {
+    "value": "BIT_COUNT(",
+    "detail": "fn"
+  },
+  {
+    "value": "BIT_LENGTH(",
+    "detail": "fn"
+  },
+  {
+    "value": "BIT_SHIFT_LEFT(",
+    "detail": "fn"
+  },
+  {
+    "value": "BIT_SHIFT_RIGHT(",
+    "detail": "fn"
+  },
+  {
+    "value": "BIT_TEST(",
+    "detail": "fn"
+  },
+  {
+    "value": "BIT_TEST_ALL(",
+    "detail": "fn"
+  },
+  {
+    "value": "BOOLAND_AGG(",
+    "detail": "fn"
+  },
+  {
+    "value": "BOOLOR_AGG(",
+    "detail": "fn"
+  },
+  {
+    "value": "BOOLXOR_AGG(",
+    "detail": "fn"
+  },
+  {
+    "value": "BOOL_AND(",
+    "detail": "fn"
+  },
+  {
+    "value": "BOOL_OR(",
+    "detail": "fn"
+  },
+  {
+    "value": "BOOL_XOR(",
+    "detail": "fn"
+  },
+  {
+    "value": "CARDINALITY(",
+    "detail": "fn"
+  },
+  {
+    "value": "CATALOGS(",
+    "detail": "fn"
+  },
+  {
+    "value": "CBRT(",
+    "detail": "fn"
+  },
+  {
+    "value": "CDC_STREAM(",
+    "detail": "fn"
+  },
+  {
+    "value": "CEIL(",
+    "detail": "fn"
+  },
+  {
+    "value": "CEILING(",
+    "detail": "fn"
+  },
+  {
+    "value": "CENTURY(",
+    "detail": "fn"
+  },
+  {
+    "value": "CHAR(",
+    "detail": "fn"
+  },
+  {
+    "value": "CHARACTER_LENGTH(",
+    "detail": "fn"
+  },
+  {
+    "value": "CHAR_LENGTH(",
+    "detail": "fn"
+  },
+  {
+    "value": "COALESCE(",
+    "detail": "fn"
+  },
+  {
+    "value": "COLLECT_LIST(",
+    "detail": "fn"
+  },
+  {
+    "value": "COLLECT_SET(",
+    "detail": "fn"
+  },
+  {
+    "value": "COMPRESS(",
+    "detail": "fn"
+  },
+  {
+    "value": "CONCAT(",
+    "detail": "fn"
+  },
+  {
+    "value": "CONCAT_WS(",
+    "detail": "fn"
+  },
+  {
+    "value": "CONNECTION_ID(",
+    "detail": "fn"
+  },
+  {
+    "value": "CONV(",
+    "detail": "fn"
+  },
+  {
+    "value": "CONVERT_TO(",
+    "detail": "fn"
+  },
+  {
+    "value": "CONVERT_TZ(",
+    "detail": "fn"
+  },
+  {
+    "value": "CORR(",
+    "detail": "fn"
+  },
+  {
+    "value": "CORR_WELFORD(",
+    "detail": "fn"
+  },
+  {
+    "value": "COS(",
+    "detail": "fn"
+  },
+  {
+    "value": "COSH(",
+    "detail": "fn"
+  },
+  {
+    "value": "COSINE_DISTANCE(",
+    "detail": "fn"
+  },
+  {
+    "value": "COSINE_SIMILARITY(",
+    "detail": "fn"
+  },
+  {
+    "value": "COT(",
+    "detail": "fn"
+  },
+  {
+    "value": "COUNT(",
+    "detail": "fn"
+  },
+  {
+    "value": "COUNTEQUAL(",
+    "detail": "fn"
+  },
+  {
+    "value": "COUNT_BY_ENUM(",
+    "detail": "fn"
+  },
+  {
+    "value": "COUNT_SUBSTRINGS(",
+    "detail": "fn"
+  },
+  {
+    "value": "COVAR(",
+    "detail": "fn"
+  },
+  {
+    "value": "COVAR_POP(",
+    "detail": "fn"
+  },
+  {
+    "value": "COVAR_SAMP(",
+    "detail": "fn"
+  },
+  {
+    "value": "CRC32(",
+    "detail": "fn"
+  },
+  {
+    "value": "CRC32_INTERNAL(",
+    "detail": "fn"
+  },
+  {
+    "value": "CROSS_PRODUCT(",
+    "detail": "fn"
+  },
+  {
+    "value": "CSC(",
+    "detail": "fn"
+  },
+  {
+    "value": "CURDATE(",
+    "detail": "fn"
+  },
+  {
+    "value": "CURRENT_CATALOG(",
+    "detail": "fn"
+  },
+  {
+    "value": "CURRENT_DATABASE(",
+    "detail": "fn"
+  },
+  {
+    "value": "CURRENT_DATE(",
+    "detail": "fn"
+  },
+  {
+    "value": "CURRENT_TIME(",
+    "detail": "fn"
+  },
+  {
+    "value": "CURRENT_TIMESTAMP(",
+    "detail": "fn"
+  },
+  {
+    "value": "CURRENT_USER(",
+    "detail": "fn"
+  },
+  {
+    "value": "CURTIME(",
+    "detail": "fn"
+  },
+  {
+    "value": "CUT_IPV6(",
+    "detail": "fn"
+  },
+  {
+    "value": "CUT_TO_FIRST_SIGNIFICANT_SUBDOMAIN(",
+    "detail": "fn"
+  },
+  {
+    "value": "DATABASE(",
+    "detail": "fn"
+  },
+  {
+    "value": "DATASKETCHES_HLL_ESTIMATE(",
+    "detail": "fn"
+  },
+  {
+    "value": "DATASKETCHES_HLL_UNION_AGG(",
+    "detail": "fn"
+  },
+  {
+    "value": "DATE(",
+    "detail": "fn"
+  },
+  {
+    "value": "DATEDIFF(",
+    "detail": "fn"
+  },
+  {
+    "value": "DATEV2(",
+    "detail": "fn"
+  },
+  {
+    "value": "DATE_ADD(",
+    "detail": "fn"
+  },
+  {
+    "value": "DATE_FORMAT(",
+    "detail": "fn"
+  },
+  {
+    "value": "DATE_SUB(",
+    "detail": "fn"
+  },
+  {
+    "value": "DATE_TRUNC(",
+    "detail": "fn"
+  },
+  {
+    "value": "DAY(",
+    "detail": "fn"
+  },
+  {
+    "value": "DAYNAME(",
+    "detail": "fn"
+  },
+  {
+    "value": "DAYOFMONTH(",
+    "detail": "fn"
+  },
+  {
+    "value": "DAYOFWEEK(",
+    "detail": "fn"
+  },
+  {
+    "value": "DAYOFYEAR(",
+    "detail": "fn"
+  },
+  {
+    "value": "DAYS_ADD(",
+    "detail": "fn"
+  },
+  {
+    "value": "DAYS_DIFF(",
+    "detail": "fn"
+  },
+  {
+    "value": "DAYS_SUB(",
+    "detail": "fn"
+  },
+  {
+    "value": "DAY_CEIL(",
+    "detail": "fn"
+  },
+  {
+    "value": "DAY_FLOOR(",
+    "detail": "fn"
+  },
+  {
+    "value": "DAY_HOUR(",
+    "detail": "fn"
+  },
+  {
+    "value": "DAY_MICROSECOND(",
+    "detail": "fn"
+  },
+  {
+    "value": "DAY_MINUTE(",
+    "detail": "fn"
+  },
+  {
+    "value": "DAY_SECOND(",
+    "detail": "fn"
+  },
+  {
+    "value": "DCEIL(",
+    "detail": "fn"
+  },
+  {
+    "value": "DECODE_AS_VARCHAR(",
+    "detail": "fn"
+  },
+  {
+    "value": "DEDUPLICATE_MAP(",
+    "detail": "fn"
+  },
+  {
+    "value": "DEGREES(",
+    "detail": "fn"
+  },
+  {
+    "value": "DEXP(",
+    "detail": "fn"
+  },
+  {
+    "value": "DFLOOR(",
+    "detail": "fn"
+  },
+  {
+    "value": "DICT_GET(",
+    "detail": "fn"
+  },
+  {
+    "value": "DICT_GET_MANY(",
+    "detail": "fn"
+  },
+  {
+    "value": "DIGITAL_MASKING(",
+    "detail": "fn"
+  },
+  {
+    "value": "DLOG1(",
+    "detail": "fn"
+  },
+  {
+    "value": "DLOG10(",
+    "detail": "fn"
+  },
+  {
+    "value": "DOMAIN(",
+    "detail": "fn"
+  },
+  {
+    "value": "DOMAIN_WITHOUT_WWW(",
+    "detail": "fn"
+  },
+  {
+    "value": "DOW(",
+    "detail": "fn"
+  },
+  {
+    "value": "DOY(",
+    "detail": "fn"
+  },
+  {
+    "value": "DPOW(",
+    "detail": "fn"
+  },
+  {
+    "value": "DROUND(",
+    "detail": "fn"
+  },
+  {
+    "value": "DSQRT(",
+    "detail": "fn"
+  },
+  {
+    "value": "DS_HLL_ESTIMATE(",
+    "detail": "fn"
+  },
+  {
+    "value": "E(",
+    "detail": "fn"
+  },
+  {
+    "value": "ELEMENT_AT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ELT(",
+    "detail": "fn"
+  },
+  {
+    "value": "EMBED(",
+    "detail": "fn"
+  },
+  {
+    "value": "ENCODE_AS_BIGINT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ENCODE_AS_INT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ENCODE_AS_LARGEINT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ENCODE_AS_SMALLINT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ENDS_WITH(",
+    "detail": "fn"
+  },
+  {
+    "value": "ESQUERY(",
+    "detail": "fn"
+  },
+  {
+    "value": "EVEN(",
+    "detail": "fn"
+  },
+  {
+    "value": "EXP(",
+    "detail": "fn"
+  },
+  {
+    "value": "EXPONENTIAL_MOVING_AVERAGE(",
+    "detail": "fn"
+  },
+  {
+    "value": "EXPORT_SET(",
+    "detail": "fn"
+  },
+  {
+    "value": "EXTRACT_URL_PARAMETER(",
+    "detail": "fn"
+  },
+  {
+    "value": "FACTORIAL(",
+    "detail": "fn"
+  },
+  {
+    "value": "FIELD(",
+    "detail": "fn"
+  },
+  {
+    "value": "FILE(",
+    "detail": "fn"
+  },
+  {
+    "value": "FIND_IN_SET(",
+    "detail": "fn"
+  },
+  {
+    "value": "FIRST_SIGNIFICANT_SUBDOMAIN(",
+    "detail": "fn"
+  },
+  {
+    "value": "FLOOR(",
+    "detail": "fn"
+  },
+  {
+    "value": "FMOD(",
+    "detail": "fn"
+  },
+  {
+    "value": "FORMAT(",
+    "detail": "fn"
+  },
+  {
+    "value": "FORMAT_NUMBER(",
+    "detail": "fn"
+  },
+  {
+    "value": "FORMAT_ROUND(",
+    "detail": "fn"
+  },
+  {
+    "value": "FPOW(",
+    "detail": "fn"
+  },
+  {
+    "value": "FROM_BASE64(",
+    "detail": "fn"
+  },
+  {
+    "value": "FROM_BASE64_BINARY(",
+    "detail": "fn"
+  },
+  {
+    "value": "FROM_BINARY(",
+    "detail": "fn"
+  },
+  {
+    "value": "FROM_DAYS(",
+    "detail": "fn"
+  },
+  {
+    "value": "FROM_HEX(",
+    "detail": "fn"
+  },
+  {
+    "value": "FROM_ISO8601_DATE(",
+    "detail": "fn"
+  },
+  {
+    "value": "FROM_MICROSECOND(",
+    "detail": "fn"
+  },
+  {
+    "value": "FROM_MILLISECOND(",
+    "detail": "fn"
+  },
+  {
+    "value": "FROM_SECOND(",
+    "detail": "fn"
+  },
+  {
+    "value": "FROM_UNIXTIME(",
+    "detail": "fn"
+  },
+  {
+    "value": "FRONTENDS(",
+    "detail": "fn"
+  },
+  {
+    "value": "FRONTENDS_DISKS(",
+    "detail": "fn"
+  },
+  {
+    "value": "G(",
+    "detail": "fn"
+  },
+  {
+    "value": "GCD(",
+    "detail": "fn"
+  },
+  {
+    "value": "GET_FORMAT(",
+    "detail": "fn"
+  },
+  {
+    "value": "GET_JSON_BIGINT(",
+    "detail": "fn"
+  },
+  {
+    "value": "GET_JSON_DOUBLE(",
+    "detail": "fn"
+  },
+  {
+    "value": "GET_JSON_INT(",
+    "detail": "fn"
+  },
+  {
+    "value": "GET_JSON_STRING(",
+    "detail": "fn"
+  },
+  {
+    "value": "GREATEST(",
+    "detail": "fn"
+  },
+  {
+    "value": "GROUPING(",
+    "detail": "fn"
+  },
+  {
+    "value": "GROUPING_ID(",
+    "detail": "fn"
+  },
+  {
+    "value": "GROUP_ARRAY(",
+    "detail": "fn"
+  },
+  {
+    "value": "GROUP_ARRAY_INTERSECT(",
+    "detail": "fn"
+  },
+  {
+    "value": "GROUP_ARRAY_UNION(",
+    "detail": "fn"
+  },
+  {
+    "value": "GROUP_BITMAP_XOR(",
+    "detail": "fn"
+  },
+  {
+    "value": "GROUP_BIT_AND(",
+    "detail": "fn"
+  },
+  {
+    "value": "GROUP_BIT_OR(",
+    "detail": "fn"
+  },
+  {
+    "value": "GROUP_BIT_XOR(",
+    "detail": "fn"
+  },
+  {
+    "value": "GROUP_COMMIT(",
+    "detail": "fn"
+  },
+  {
+    "value": "GROUP_CONCAT(",
+    "detail": "fn"
+  },
+  {
+    "value": "GROUP_UNIQ_ARRAY(",
+    "detail": "fn"
+  },
+  {
+    "value": "HAMMING_DISTANCE(",
+    "detail": "fn"
+  },
+  {
+    "value": "HDFS(",
+    "detail": "fn"
+  },
+  {
+    "value": "HEX(",
+    "detail": "fn"
+  },
+  {
+    "value": "HIST(",
+    "detail": "fn"
+  },
+  {
+    "value": "HISTOGRAM(",
+    "detail": "fn"
+  },
+  {
+    "value": "HLL_CARDINALITY(",
+    "detail": "fn"
+  },
+  {
+    "value": "HLL_EMPTY(",
+    "detail": "fn"
+  },
+  {
+    "value": "HLL_FROM_BASE64(",
+    "detail": "fn"
+  },
+  {
+    "value": "HLL_HASH(",
+    "detail": "fn"
+  },
+  {
+    "value": "HLL_RAW_AGG(",
+    "detail": "fn"
+  },
+  {
+    "value": "HLL_TO_BASE64(",
+    "detail": "fn"
+  },
+  {
+    "value": "HLL_UNION(",
+    "detail": "fn"
+  },
+  {
+    "value": "HLL_UNION_AGG(",
+    "detail": "fn"
+  },
+  {
+    "value": "HOUR(",
+    "detail": "fn"
+  },
+  {
+    "value": "HOURS_ADD(",
+    "detail": "fn"
+  },
+  {
+    "value": "HOURS_DIFF(",
+    "detail": "fn"
+  },
+  {
+    "value": "HOURS_SUB(",
+    "detail": "fn"
+  },
+  {
+    "value": "HOUR_CEIL(",
+    "detail": "fn"
+  },
+  {
+    "value": "HOUR_FLOOR(",
+    "detail": "fn"
+  },
+  {
+    "value": "HOUR_FROM_UNIXTIME(",
+    "detail": "fn"
+  },
+  {
+    "value": "HOUR_MICROSECOND(",
+    "detail": "fn"
+  },
+  {
+    "value": "HOUR_MINUTE(",
+    "detail": "fn"
+  },
+  {
+    "value": "HOUR_SECOND(",
+    "detail": "fn"
+  },
+  {
+    "value": "HTTP(",
+    "detail": "fn"
+  },
+  {
+    "value": "HTTP_STREAM(",
+    "detail": "fn"
+  },
+  {
+    "value": "HUDI_META(",
+    "detail": "fn"
+  },
+  {
+    "value": "IF(",
+    "detail": "fn"
+  },
+  {
+    "value": "IFNULL(",
+    "detail": "fn"
+  },
+  {
+    "value": "IGNORE(",
+    "detail": "fn"
+  },
+  {
+    "value": "INET6_ATON(",
+    "detail": "fn"
+  },
+  {
+    "value": "INET6_NTOA(",
+    "detail": "fn"
+  },
+  {
+    "value": "INET_ATON(",
+    "detail": "fn"
+  },
+  {
+    "value": "INET_NTOA(",
+    "detail": "fn"
+  },
+  {
+    "value": "INITCAP(",
+    "detail": "fn"
+  },
+  {
+    "value": "INNER_PRODUCT(",
+    "detail": "fn"
+  },
+  {
+    "value": "INNER_PRODUCT_APPROXIMATE(",
+    "detail": "fn"
+  },
+  {
+    "value": "INSERT(",
+    "detail": "fn"
+  },
+  {
+    "value": "INSTR(",
+    "detail": "fn"
+  },
+  {
+    "value": "INTERSECT_COUNT(",
+    "detail": "fn"
+  },
+  {
+    "value": "INTERVAL(",
+    "detail": "fn"
+  },
+  {
+    "value": "INT_TO_UUID(",
+    "detail": "fn"
+  },
+  {
+    "value": "IPV4_CIDR_TO_RANGE(",
+    "detail": "fn"
+  },
+  {
+    "value": "IPV4_NUM_TO_STRING(",
+    "detail": "fn"
+  },
+  {
+    "value": "IPV4_STRING_TO_NUM(",
+    "detail": "fn"
+  },
+  {
+    "value": "IPV4_STRING_TO_NUM_OR_DEFAULT(",
+    "detail": "fn"
+  },
+  {
+    "value": "IPV4_STRING_TO_NUM_OR_NULL(",
+    "detail": "fn"
+  },
+  {
+    "value": "IPV4_TO_IPV6(",
+    "detail": "fn"
+  },
+  {
+    "value": "IPV6_CIDR_TO_RANGE(",
+    "detail": "fn"
+  },
+  {
+    "value": "IPV6_FROM_UINT128_STRING_OR_NULL(",
+    "detail": "fn"
+  },
+  {
+    "value": "IPV6_NUM_TO_STRING(",
+    "detail": "fn"
+  },
+  {
+    "value": "IPV6_STRING_TO_NUM(",
+    "detail": "fn"
+  },
+  {
+    "value": "IPV6_STRING_TO_NUM_OR_DEFAULT(",
+    "detail": "fn"
+  },
+  {
+    "value": "IPV6_STRING_TO_NUM_OR_NULL(",
+    "detail": "fn"
+  },
+  {
+    "value": "ISINF(",
+    "detail": "fn"
+  },
+  {
+    "value": "ISNAN(",
+    "detail": "fn"
+  },
+  {
+    "value": "IS_IPV4(",
+    "detail": "fn"
+  },
+  {
+    "value": "IS_IPV4_COMPAT(",
+    "detail": "fn"
+  },
+  {
+    "value": "IS_IPV4_MAPPED(",
+    "detail": "fn"
+  },
+  {
+    "value": "IS_IPV4_STRING(",
+    "detail": "fn"
+  },
+  {
+    "value": "IS_IPV6(",
+    "detail": "fn"
+  },
+  {
+    "value": "IS_IPV6_STRING(",
+    "detail": "fn"
+  },
+  {
+    "value": "IS_IP_ADDRESS_IN_RANGE(",
+    "detail": "fn"
+  },
+  {
+    "value": "IS_UUID(",
+    "detail": "fn"
+  },
+  {
+    "value": "IS_VALID_UTF8(",
+    "detail": "fn"
+  },
+  {
+    "value": "JOBS(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSONB_ARRAY(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSONB_ARRAY_IGNORE_NULL(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSONB_EXISTS_PATH(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSONB_EXTRACT(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSONB_EXTRACT_BIGINT(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSONB_EXTRACT_BOOL(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSONB_EXTRACT_DOUBLE(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSONB_EXTRACT_INT(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSONB_EXTRACT_ISNULL(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSONB_EXTRACT_LARGEINT(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSONB_EXTRACT_STRING(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSONB_HASH(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSONB_INSERT(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSONB_KEYS(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSONB_OBJECT(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSONB_PARSE(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSONB_PARSE_ERROR_TO_NULL(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSONB_PARSE_ERROR_TO_VALUE(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSONB_REPLACE(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSONB_SET(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSONB_TYPE(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSONB_VALID(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_ARRAY(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_ARRAY_IGNORE_NULL(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_CONTAINS(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_EXISTS_PATH(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_EXTRACT(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_EXTRACT_BIGINT(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_EXTRACT_BOOL(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_EXTRACT_DOUBLE(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_EXTRACT_INT(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_EXTRACT_ISNULL(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_EXTRACT_LARGEINT(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_EXTRACT_NO_QUOTES(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_EXTRACT_STRING(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_HASH(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_INSERT(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_KEYS(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_LENGTH(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_OBJECT(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_OBJECT_FLATTEN(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_PARSE(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_PARSE_ERROR_TO_NULL(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_PARSE_ERROR_TO_VALUE(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_QUOTE(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_REMOVE(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_REPLACE(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_SEARCH(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_SET(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_TYPE(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_UNQUOTE(",
+    "detail": "fn"
+  },
+  {
+    "value": "JSON_VALID(",
+    "detail": "fn"
+  },
+  {
+    "value": "KURT(",
+    "detail": "fn"
+  },
+  {
+    "value": "KURTOSIS(",
+    "detail": "fn"
+  },
+  {
+    "value": "KURT_POP(",
+    "detail": "fn"
+  },
+  {
+    "value": "L1_DISTANCE(",
+    "detail": "fn"
+  },
+  {
+    "value": "L2_DISTANCE(",
+    "detail": "fn"
+  },
+  {
+    "value": "L2_DISTANCE_APPROXIMATE(",
+    "detail": "fn"
+  },
+  {
+    "value": "LAST_DAY(",
+    "detail": "fn"
+  },
+  {
+    "value": "LAST_QUERY_ID(",
+    "detail": "fn"
+  },
+  {
+    "value": "LCASE(",
+    "detail": "fn"
+  },
+  {
+    "value": "LCM(",
+    "detail": "fn"
+  },
+  {
+    "value": "LEAST(",
+    "detail": "fn"
+  },
+  {
+    "value": "LEFT(",
+    "detail": "fn"
+  },
+  {
+    "value": "LENGTH(",
+    "detail": "fn"
+  },
+  {
+    "value": "LEVENSHTEIN(",
+    "detail": "fn"
+  },
+  {
+    "value": "LIKE(",
+    "detail": "fn"
+  },
+  {
+    "value": "LINEAR_HISTOGRAM(",
+    "detail": "fn"
+  },
+  {
+    "value": "LN(",
+    "detail": "fn"
+  },
+  {
+    "value": "LOCAL(",
+    "detail": "fn"
+  },
+  {
+    "value": "LOCALTIME(",
+    "detail": "fn"
+  },
+  {
+    "value": "LOCALTIMESTAMP(",
+    "detail": "fn"
+  },
+  {
+    "value": "LOCATE(",
+    "detail": "fn"
+  },
+  {
+    "value": "LOG(",
+    "detail": "fn"
+  },
+  {
+    "value": "LOG10(",
+    "detail": "fn"
+  },
+  {
+    "value": "LOG2(",
+    "detail": "fn"
+  },
+  {
+    "value": "LOWER(",
+    "detail": "fn"
+  },
+  {
+    "value": "LPAD(",
+    "detail": "fn"
+  },
+  {
+    "value": "LTRIM(",
+    "detail": "fn"
+  },
+  {
+    "value": "LTRIM_IN(",
+    "detail": "fn"
+  },
+  {
+    "value": "MAKEDATE(",
+    "detail": "fn"
+  },
+  {
+    "value": "MAKETIME(",
+    "detail": "fn"
+  },
+  {
+    "value": "MAKE_SET(",
+    "detail": "fn"
+  },
+  {
+    "value": "MAP(",
+    "detail": "fn"
+  },
+  {
+    "value": "MAP_AGG(",
+    "detail": "fn"
+  },
+  {
+    "value": "MAP_AGG_V1(",
+    "detail": "fn"
+  },
+  {
+    "value": "MAP_AGG_V2(",
+    "detail": "fn"
+  },
+  {
+    "value": "MAP_CONTAINS_ENTRY(",
+    "detail": "fn"
+  },
+  {
+    "value": "MAP_CONTAINS_KEY(",
+    "detail": "fn"
+  },
+  {
+    "value": "MAP_CONTAINS_VALUE(",
+    "detail": "fn"
+  },
+  {
+    "value": "MAP_ENTRIES(",
+    "detail": "fn"
+  },
+  {
+    "value": "MAP_KEYS(",
+    "detail": "fn"
+  },
+  {
+    "value": "MAP_SIZE(",
+    "detail": "fn"
+  },
+  {
+    "value": "MAP_VALUES(",
+    "detail": "fn"
+  },
+  {
+    "value": "MASK(",
+    "detail": "fn"
+  },
+  {
+    "value": "MASK_FIRST_N(",
+    "detail": "fn"
+  },
+  {
+    "value": "MASK_LAST_N(",
+    "detail": "fn"
+  },
+  {
+    "value": "MAX(",
+    "detail": "fn"
+  },
+  {
+    "value": "MAX_BY(",
+    "detail": "fn"
+  },
+  {
+    "value": "MD5(",
+    "detail": "fn"
+  },
+  {
+    "value": "MD5SUM(",
+    "detail": "fn"
+  },
+  {
+    "value": "MEDIAN(",
+    "detail": "fn"
+  },
+  {
+    "value": "MICROSECOND(",
+    "detail": "fn"
+  },
+  {
+    "value": "MICROSECONDS_ADD(",
+    "detail": "fn"
+  },
+  {
+    "value": "MICROSECONDS_DIFF(",
+    "detail": "fn"
+  },
+  {
+    "value": "MICROSECONDS_SUB(",
+    "detail": "fn"
+  },
+  {
+    "value": "MICROSECOND_FROM_UNIXTIME(",
+    "detail": "fn"
+  },
+  {
+    "value": "MICROSECOND_TIMESTAMP(",
+    "detail": "fn"
+  },
+  {
+    "value": "MID(",
+    "detail": "fn"
+  },
+  {
+    "value": "MILLISECONDS_ADD(",
+    "detail": "fn"
+  },
+  {
+    "value": "MILLISECONDS_DIFF(",
+    "detail": "fn"
+  },
+  {
+    "value": "MILLISECONDS_SUB(",
+    "detail": "fn"
+  },
+  {
+    "value": "MILLISECOND_TIMESTAMP(",
+    "detail": "fn"
+  },
+  {
+    "value": "MIN(",
+    "detail": "fn"
+  },
+  {
+    "value": "MINUTE(",
+    "detail": "fn"
+  },
+  {
+    "value": "MINUTES_ADD(",
+    "detail": "fn"
+  },
+  {
+    "value": "MINUTES_DIFF(",
+    "detail": "fn"
+  },
+  {
+    "value": "MINUTES_SUB(",
+    "detail": "fn"
+  },
+  {
+    "value": "MINUTE_CEIL(",
+    "detail": "fn"
+  },
+  {
+    "value": "MINUTE_FLOOR(",
+    "detail": "fn"
+  },
+  {
+    "value": "MINUTE_FROM_UNIXTIME(",
+    "detail": "fn"
+  },
+  {
+    "value": "MINUTE_MICROSECOND(",
+    "detail": "fn"
+  },
+  {
+    "value": "MINUTE_SECOND(",
+    "detail": "fn"
+  },
+  {
+    "value": "MIN_BY(",
+    "detail": "fn"
+  },
+  {
+    "value": "MONEY_FORMAT(",
+    "detail": "fn"
+  },
+  {
+    "value": "MONTH(",
+    "detail": "fn"
+  },
+  {
+    "value": "MONTHNAME(",
+    "detail": "fn"
+  },
+  {
+    "value": "MONTHS_ADD(",
+    "detail": "fn"
+  },
+  {
+    "value": "MONTHS_BETWEEN(",
+    "detail": "fn"
+  },
+  {
+    "value": "MONTHS_DIFF(",
+    "detail": "fn"
+  },
+  {
+    "value": "MONTHS_SUB(",
+    "detail": "fn"
+  },
+  {
+    "value": "MONTH_CEIL(",
+    "detail": "fn"
+  },
+  {
+    "value": "MONTH_FLOOR(",
+    "detail": "fn"
+  },
+  {
+    "value": "MULTI_DISTINCT_COUNT(",
+    "detail": "fn"
+  },
+  {
+    "value": "MULTI_DISTINCT_GROUP_CONCAT(",
+    "detail": "fn"
+  },
+  {
+    "value": "MULTI_DISTINCT_SUM(",
+    "detail": "fn"
+  },
+  {
+    "value": "MULTI_DISTINCT_SUM0(",
+    "detail": "fn"
+  },
+  {
+    "value": "MULTI_MATCH(",
+    "detail": "fn"
+  },
+  {
+    "value": "MULTI_MATCH_ANY(",
+    "detail": "fn"
+  },
+  {
+    "value": "MULTI_SEARCH_ALL_POSITIONS(",
+    "detail": "fn"
+  },
+  {
+    "value": "MURMUR_HASH3_128(",
+    "detail": "fn"
+  },
+  {
+    "value": "MURMUR_HASH3_32(",
+    "detail": "fn"
+  },
+  {
+    "value": "MURMUR_HASH3_64(",
+    "detail": "fn"
+  },
+  {
+    "value": "MURMUR_HASH3_64_V2(",
+    "detail": "fn"
+  },
+  {
+    "value": "MURMUR_HASH3_U128(",
+    "detail": "fn"
+  },
+  {
+    "value": "MURMUR_HASH3_U64_V2(",
+    "detail": "fn"
+  },
+  {
+    "value": "MV_INFOS(",
+    "detail": "fn"
+  },
+  {
+    "value": "NAMED_STRUCT(",
+    "detail": "fn"
+  },
+  {
+    "value": "NDV(",
+    "detail": "fn"
+  },
+  {
+    "value": "NEGATIVE(",
+    "detail": "fn"
+  },
+  {
+    "value": "NEXT_DAY(",
+    "detail": "fn"
+  },
+  {
+    "value": "NGRAM_SEARCH(",
+    "detail": "fn"
+  },
+  {
+    "value": "NON_NULLABLE(",
+    "detail": "fn"
+  },
+  {
+    "value": "NORMALIZE_JSONB_NUMBERS_TO_DOUBLE(",
+    "detail": "fn"
+  },
+  {
+    "value": "NORMALIZE_JSON_NUMBERS_TO_DOUBLE(",
+    "detail": "fn"
+  },
+  {
+    "value": "NORMAL_CDF(",
+    "detail": "fn"
+  },
+  {
+    "value": "NOT_NULL_OR_EMPTY(",
+    "detail": "fn"
+  },
+  {
+    "value": "NOW(",
+    "detail": "fn"
+  },
+  {
+    "value": "NULLABLE(",
+    "detail": "fn"
+  },
+  {
+    "value": "NULLIF(",
+    "detail": "fn"
+  },
+  {
+    "value": "NULL_OR_EMPTY(",
+    "detail": "fn"
+  },
+  {
+    "value": "NUMBERS(",
+    "detail": "fn"
+  },
+  {
+    "value": "NVL(",
+    "detail": "fn"
+  },
+  {
+    "value": "OCTET_LENGTH(",
+    "detail": "fn"
+  },
+  {
+    "value": "ORTHOGONAL_BITMAP_EXPR_CALCULATE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ORTHOGONAL_BITMAP_EXPR_CALCULATE_COUNT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ORTHOGONAL_BITMAP_INTERSECT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ORTHOGONAL_BITMAP_INTERSECT_COUNT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ORTHOGONAL_BITMAP_UNION_COUNT(",
+    "detail": "fn"
+  },
+  {
+    "value": "OVERLAY(",
+    "detail": "fn"
+  },
+  {
+    "value": "PARQUET_BLOOM_PROBE(",
+    "detail": "fn"
+  },
+  {
+    "value": "PARQUET_FILE_METADATA(",
+    "detail": "fn"
+  },
+  {
+    "value": "PARQUET_KV_METADATA(",
+    "detail": "fn"
+  },
+  {
+    "value": "PARQUET_META(",
+    "detail": "fn"
+  },
+  {
+    "value": "PARSE_DATA_SIZE(",
+    "detail": "fn"
+  },
+  {
+    "value": "PARSE_URL(",
+    "detail": "fn"
+  },
+  {
+    "value": "PARTITIONS(",
+    "detail": "fn"
+  },
+  {
+    "value": "PARTITION_VALUES(",
+    "detail": "fn"
+  },
+  {
+    "value": "PASSWORD(",
+    "detail": "fn"
+  },
+  {
+    "value": "PERCENTILE(",
+    "detail": "fn"
+  },
+  {
+    "value": "PERCENTILE_APPROX(",
+    "detail": "fn"
+  },
+  {
+    "value": "PERCENTILE_APPROX_WEIGHTED(",
+    "detail": "fn"
+  },
+  {
+    "value": "PERCENTILE_ARRAY(",
+    "detail": "fn"
+  },
+  {
+    "value": "PERCENTILE_CONT(",
+    "detail": "fn"
+  },
+  {
+    "value": "PERCENTILE_RESERVOIR(",
+    "detail": "fn"
+  },
+  {
+    "value": "PERIOD_ADD(",
+    "detail": "fn"
+  },
+  {
+    "value": "PERIOD_DIFF(",
+    "detail": "fn"
+  },
+  {
+    "value": "PI(",
+    "detail": "fn"
+  },
+  {
+    "value": "PMOD(",
+    "detail": "fn"
+  },
+  {
+    "value": "POSITION(",
+    "detail": "fn"
+  },
+  {
+    "value": "POSITIVE(",
+    "detail": "fn"
+  },
+  {
+    "value": "POW(",
+    "detail": "fn"
+  },
+  {
+    "value": "POWER(",
+    "detail": "fn"
+  },
+  {
+    "value": "PREVIOUS_DAY(",
+    "detail": "fn"
+  },
+  {
+    "value": "PROTOCOL(",
+    "detail": "fn"
+  },
+  {
+    "value": "QUANTILE_PERCENT(",
+    "detail": "fn"
+  },
+  {
+    "value": "QUANTILE_STATE_EMPTY(",
+    "detail": "fn"
+  },
+  {
+    "value": "QUANTILE_STATE_FROM_BASE64(",
+    "detail": "fn"
+  },
+  {
+    "value": "QUANTILE_STATE_TO_BASE64(",
+    "detail": "fn"
+  },
+  {
+    "value": "QUANTILE_UNION(",
+    "detail": "fn"
+  },
+  {
+    "value": "QUARTER(",
+    "detail": "fn"
+  },
+  {
+    "value": "QUARTERS_ADD(",
+    "detail": "fn"
+  },
+  {
+    "value": "QUARTERS_DIFF(",
+    "detail": "fn"
+  },
+  {
+    "value": "QUARTERS_SUB(",
+    "detail": "fn"
+  },
+  {
+    "value": "QUARTER_CEIL(",
+    "detail": "fn"
+  },
+  {
+    "value": "QUARTER_FLOOR(",
+    "detail": "fn"
+  },
+  {
+    "value": "QUERY(",
+    "detail": "fn"
+  },
+  {
+    "value": "QUOTE(",
+    "detail": "fn"
+  },
+  {
+    "value": "RADIANS(",
+    "detail": "fn"
+  },
+  {
+    "value": "RAND(",
+    "detail": "fn"
+  },
+  {
+    "value": "RANDOM(",
+    "detail": "fn"
+  },
+  {
+    "value": "RANDOM_BYTES(",
+    "detail": "fn"
+  },
+  {
+    "value": "REGEXP(",
+    "detail": "fn"
+  },
+  {
+    "value": "REGEXP_COUNT(",
+    "detail": "fn"
+  },
+  {
+    "value": "REGEXP_EXTRACT(",
+    "detail": "fn"
+  },
+  {
+    "value": "REGEXP_EXTRACT_ALL(",
+    "detail": "fn"
+  },
+  {
+    "value": "REGEXP_EXTRACT_OR_NULL(",
+    "detail": "fn"
+  },
+  {
+    "value": "REGEXP_REPLACE(",
+    "detail": "fn"
+  },
+  {
+    "value": "REGEXP_REPLACE_ONE(",
+    "detail": "fn"
+  },
+  {
+    "value": "REGEXP_SPLIT_TO_ARRAY(",
+    "detail": "fn"
+  },
+  {
+    "value": "REGR_AVGX(",
+    "detail": "fn"
+  },
+  {
+    "value": "REGR_AVGY(",
+    "detail": "fn"
+  },
+  {
+    "value": "REGR_COUNT(",
+    "detail": "fn"
+  },
+  {
+    "value": "REGR_INTERCEPT(",
+    "detail": "fn"
+  },
+  {
+    "value": "REGR_R2(",
+    "detail": "fn"
+  },
+  {
+    "value": "REGR_SLOPE(",
+    "detail": "fn"
+  },
+  {
+    "value": "REGR_SXX(",
+    "detail": "fn"
+  },
+  {
+    "value": "REGR_SXY(",
+    "detail": "fn"
+  },
+  {
+    "value": "REGR_SYY(",
+    "detail": "fn"
+  },
+  {
+    "value": "REPEAT(",
+    "detail": "fn"
+  },
+  {
+    "value": "REPLACE(",
+    "detail": "fn"
+  },
+  {
+    "value": "REPLACE_EMPTY(",
+    "detail": "fn"
+  },
+  {
+    "value": "RETENTION(",
+    "detail": "fn"
+  },
+  {
+    "value": "REVERSE(",
+    "detail": "fn"
+  },
+  {
+    "value": "RIGHT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ROUND(",
+    "detail": "fn"
+  },
+  {
+    "value": "ROUND_BANKERS(",
+    "detail": "fn"
+  },
+  {
+    "value": "RPAD(",
+    "detail": "fn"
+  },
+  {
+    "value": "RTRIM(",
+    "detail": "fn"
+  },
+  {
+    "value": "RTRIM_IN(",
+    "detail": "fn"
+  },
+  {
+    "value": "S3(",
+    "detail": "fn"
+  },
+  {
+    "value": "SCHEMA(",
+    "detail": "fn"
+  },
+  {
+    "value": "SCORE(",
+    "detail": "fn"
+  },
+  {
+    "value": "SEARCH(",
+    "detail": "fn"
+  },
+  {
+    "value": "SEC(",
+    "detail": "fn"
+  },
+  {
+    "value": "SECOND(",
+    "detail": "fn"
+  },
+  {
+    "value": "SECONDS_ADD(",
+    "detail": "fn"
+  },
+  {
+    "value": "SECONDS_DIFF(",
+    "detail": "fn"
+  },
+  {
+    "value": "SECONDS_SUB(",
+    "detail": "fn"
+  },
+  {
+    "value": "SECOND_CEIL(",
+    "detail": "fn"
+  },
+  {
+    "value": "SECOND_FLOOR(",
+    "detail": "fn"
+  },
+  {
+    "value": "SECOND_FROM_UNIXTIME(",
+    "detail": "fn"
+  },
+  {
+    "value": "SECOND_MICROSECOND(",
+    "detail": "fn"
+  },
+  {
+    "value": "SECOND_TIMESTAMP(",
+    "detail": "fn"
+  },
+  {
+    "value": "SEC_TO_TIME(",
+    "detail": "fn"
+  },
+  {
+    "value": "SEM(",
+    "detail": "fn"
+  },
+  {
+    "value": "SEQUENCE(",
+    "detail": "fn"
+  },
+  {
+    "value": "SEQUENCE_COUNT(",
+    "detail": "fn"
+  },
+  {
+    "value": "SEQUENCE_MATCH(",
+    "detail": "fn"
+  },
+  {
+    "value": "SESSION_USER(",
+    "detail": "fn"
+  },
+  {
+    "value": "SHA(",
+    "detail": "fn"
+  },
+  {
+    "value": "SHA1(",
+    "detail": "fn"
+  },
+  {
+    "value": "SHA2(",
+    "detail": "fn"
+  },
+  {
+    "value": "SHUFFLE(",
+    "detail": "fn"
+  },
+  {
+    "value": "SIGN(",
+    "detail": "fn"
+  },
+  {
+    "value": "SIGNBIT(",
+    "detail": "fn"
+  },
+  {
+    "value": "SIN(",
+    "detail": "fn"
+  },
+  {
+    "value": "SINH(",
+    "detail": "fn"
+  },
+  {
+    "value": "SIZE(",
+    "detail": "fn"
+  },
+  {
+    "value": "SKEW(",
+    "detail": "fn"
+  },
+  {
+    "value": "SKEWNESS(",
+    "detail": "fn"
+  },
+  {
+    "value": "SKEW_POP(",
+    "detail": "fn"
+  },
+  {
+    "value": "SLEEP(",
+    "detail": "fn"
+  },
+  {
+    "value": "SM3(",
+    "detail": "fn"
+  },
+  {
+    "value": "SM3SUM(",
+    "detail": "fn"
+  },
+  {
+    "value": "SM4_DECRYPT(",
+    "detail": "fn"
+  },
+  {
+    "value": "SM4_ENCRYPT(",
+    "detail": "fn"
+  },
+  {
+    "value": "SORT_JSONB_OBJECT_KEYS(",
+    "detail": "fn"
+  },
+  {
+    "value": "SORT_JSON_OBJECT_KEYS(",
+    "detail": "fn"
+  },
+  {
+    "value": "SOUNDEX(",
+    "detail": "fn"
+  },
+  {
+    "value": "SPACE(",
+    "detail": "fn"
+  },
+  {
+    "value": "SPLIT(",
+    "detail": "fn"
+  },
+  {
+    "value": "SPLIT_BY_CHAR(",
+    "detail": "fn"
+  },
+  {
+    "value": "SPLIT_BY_REGEXP(",
+    "detail": "fn"
+  },
+  {
+    "value": "SPLIT_BY_STRING(",
+    "detail": "fn"
+  },
+  {
+    "value": "SPLIT_PART(",
+    "detail": "fn"
+  },
+  {
+    "value": "SQRT(",
+    "detail": "fn"
+  },
+  {
+    "value": "STARTS_WITH(",
+    "detail": "fn"
+  },
+  {
+    "value": "STD(",
+    "detail": "fn"
+  },
+  {
+    "value": "STDDEV(",
+    "detail": "fn"
+  },
+  {
+    "value": "STDDEV_POP(",
+    "detail": "fn"
+  },
+  {
+    "value": "STDDEV_SAMP(",
+    "detail": "fn"
+  },
+  {
+    "value": "STRCMP(",
+    "detail": "fn"
+  },
+  {
+    "value": "STRIP_NULL_VALUE(",
+    "detail": "fn"
+  },
+  {
+    "value": "STRLEFT(",
+    "detail": "fn"
+  },
+  {
+    "value": "STRRIGHT(",
+    "detail": "fn"
+  },
+  {
+    "value": "STRUCT(",
+    "detail": "fn"
+  },
+  {
+    "value": "STR_TO_DATE(",
+    "detail": "fn"
+  },
+  {
+    "value": "STR_TO_MAP(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_ANGLE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_ANGLE_SPHERE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_AREA_SQUARE_KM(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_AREA_SQUARE_METERS(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_ASBINARY(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_ASTEXT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_ASWKT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_AZIMUTH(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_CIRCLE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_CONTAINS(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_DISJOINT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_DISTANCE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_DISTANCE_SPHERE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_GEOMETRIES(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_GEOMETRYFROMTEXT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_GEOMETRYFROMWKB(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_GEOMETRYTYPE(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_GEOMFROMTEXT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_GEOMFROMWKB(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_INTERSECTS(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_LENGTH(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_LINEFROMTEXT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_LINESTRINGFROMTEXT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_NPOINTS(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_NUMGEOMETRIES(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_NUMPOINTS(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_POINT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_POLYFROMTEXT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_POLYGON(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_POLYGONFROMTEXT(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_TOUCHES(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_X(",
+    "detail": "fn"
+  },
+  {
+    "value": "ST_Y(",
+    "detail": "fn"
+  },
+  {
+    "value": "SUBDATE(",
+    "detail": "fn"
+  },
+  {
+    "value": "SUBSTR(",
+    "detail": "fn"
+  },
+  {
+    "value": "SUBSTRING(",
+    "detail": "fn"
+  },
+  {
+    "value": "SUBSTRING_INDEX(",
+    "detail": "fn"
+  },
+  {
+    "value": "SUB_BINARY(",
+    "detail": "fn"
+  },
+  {
+    "value": "SUB_BITMAP(",
+    "detail": "fn"
+  },
+  {
+    "value": "SUB_REPLACE(",
+    "detail": "fn"
+  },
+  {
+    "value": "SUB_TIME(",
+    "detail": "fn"
+  },
+  {
+    "value": "SUM(",
+    "detail": "fn"
+  },
+  {
+    "value": "SUM0(",
+    "detail": "fn"
+  },
+  {
+    "value": "TAN(",
+    "detail": "fn"
+  },
+  {
+    "value": "TANH(",
+    "detail": "fn"
+  },
+  {
+    "value": "TASKS(",
+    "detail": "fn"
+  },
+  {
+    "value": "TIME(",
+    "detail": "fn"
+  },
+  {
+    "value": "TIMEDIFF(",
+    "detail": "fn"
+  },
+  {
+    "value": "TIMESTAMP(",
+    "detail": "fn"
+  },
+  {
+    "value": "TIME_FORMAT(",
+    "detail": "fn"
+  },
+  {
+    "value": "TIME_TO_SEC(",
+    "detail": "fn"
+  },
+  {
+    "value": "TOKENIZE(",
+    "detail": "fn"
+  },
+  {
+    "value": "TOPN(",
+    "detail": "fn"
+  },
+  {
+    "value": "TOPN_ARRAY(",
+    "detail": "fn"
+  },
+  {
+    "value": "TOPN_WEIGHTED(",
+    "detail": "fn"
+  },
+  {
+    "value": "TOP_LEVEL_DOMAIN(",
+    "detail": "fn"
+  },
+  {
+    "value": "TO_BASE64(",
+    "detail": "fn"
+  },
+  {
+    "value": "TO_BASE64_BINARY(",
+    "detail": "fn"
+  },
+  {
+    "value": "TO_BINARY(",
+    "detail": "fn"
+  },
+  {
+    "value": "TO_BITMAP(",
+    "detail": "fn"
+  },
+  {
+    "value": "TO_BITMAP_WITH_CHECK(",
+    "detail": "fn"
+  },
+  {
+    "value": "TO_DATE(",
+    "detail": "fn"
+  },
+  {
+    "value": "TO_DATEV2(",
+    "detail": "fn"
+  },
+  {
+    "value": "TO_DAYS(",
+    "detail": "fn"
+  },
+  {
+    "value": "TO_HEX(",
+    "detail": "fn"
+  },
+  {
+    "value": "TO_IPV4(",
+    "detail": "fn"
+  },
+  {
+    "value": "TO_IPV4_OR_DEFAULT(",
+    "detail": "fn"
+  },
+  {
+    "value": "TO_IPV4_OR_NULL(",
+    "detail": "fn"
+  },
+  {
+    "value": "TO_IPV6(",
+    "detail": "fn"
+  },
+  {
+    "value": "TO_IPV6_OR_DEFAULT(",
+    "detail": "fn"
+  },
+  {
+    "value": "TO_IPV6_OR_NULL(",
+    "detail": "fn"
+  },
+  {
+    "value": "TO_ISO8601(",
+    "detail": "fn"
+  },
+  {
+    "value": "TO_JSON(",
+    "detail": "fn"
+  },
+  {
+    "value": "TO_MONDAY(",
+    "detail": "fn"
+  },
+  {
+    "value": "TO_QUANTILE_STATE(",
+    "detail": "fn"
+  },
+  {
+    "value": "TO_SECONDS(",
+    "detail": "fn"
+  },
+  {
+    "value": "TRANSLATE(",
+    "detail": "fn"
+  },
+  {
+    "value": "TRIM(",
+    "detail": "fn"
+  },
+  {
+    "value": "TRIM_IN(",
+    "detail": "fn"
+  },
+  {
+    "value": "TRUNCATE(",
+    "detail": "fn"
+  },
+  {
+    "value": "UCASE(",
+    "detail": "fn"
+  },
+  {
+    "value": "UNCOMPRESS(",
+    "detail": "fn"
+  },
+  {
+    "value": "UNHEX(",
+    "detail": "fn"
+  },
+  {
+    "value": "UNHEX_NULL(",
+    "detail": "fn"
+  },
+  {
+    "value": "UNICODE_NORMALIZE(",
+    "detail": "fn"
+  },
+  {
+    "value": "UNIFORM(",
+    "detail": "fn"
+  },
+  {
+    "value": "UNIX_TIMESTAMP(",
+    "detail": "fn"
+  },
+  {
+    "value": "UPPER(",
+    "detail": "fn"
+  },
+  {
+    "value": "URL_DECODE(",
+    "detail": "fn"
+  },
+  {
+    "value": "URL_ENCODE(",
+    "detail": "fn"
+  },
+  {
+    "value": "USER(",
+    "detail": "fn"
+  },
+  {
+    "value": "UTC_DATE(",
+    "detail": "fn"
+  },
+  {
+    "value": "UTC_TIME(",
+    "detail": "fn"
+  },
+  {
+    "value": "UTC_TIMESTAMP(",
+    "detail": "fn"
+  },
+  {
+    "value": "UUID(",
+    "detail": "fn"
+  },
+  {
+    "value": "UUID_NUMERIC(",
+    "detail": "fn"
+  },
+  {
+    "value": "UUID_TO_INT(",
+    "detail": "fn"
+  },
+  {
+    "value": "VARIANCE(",
+    "detail": "fn"
+  },
+  {
+    "value": "VARIANCE_POP(",
+    "detail": "fn"
+  },
+  {
+    "value": "VARIANCE_SAMP(",
+    "detail": "fn"
+  },
+  {
+    "value": "VARIANT_TYPE(",
+    "detail": "fn"
+  },
+  {
+    "value": "VAR_POP(",
+    "detail": "fn"
+  },
+  {
+    "value": "VAR_SAMP(",
+    "detail": "fn"
+  },
+  {
+    "value": "VERSION(",
+    "detail": "fn"
+  },
+  {
+    "value": "WEEK(",
+    "detail": "fn"
+  },
+  {
+    "value": "WEEKDAY(",
+    "detail": "fn"
+  },
+  {
+    "value": "WEEKOFYEAR(",
+    "detail": "fn"
+  },
+  {
+    "value": "WEEKS_ADD(",
+    "detail": "fn"
+  },
+  {
+    "value": "WEEKS_DIFF(",
+    "detail": "fn"
+  },
+  {
+    "value": "WEEKS_SUB(",
+    "detail": "fn"
+  },
+  {
+    "value": "WEEK_CEIL(",
+    "detail": "fn"
+  },
+  {
+    "value": "WEEK_FLOOR(",
+    "detail": "fn"
+  },
+  {
+    "value": "WIDTH_BUCKET(",
+    "detail": "fn"
+  },
+  {
+    "value": "WINDOW_FUNNEL(",
+    "detail": "fn"
+  },
+  {
+    "value": "WINDOW_FUNNEL_V1(",
+    "detail": "fn"
+  },
+  {
+    "value": "WINDOW_FUNNEL_V2(",
+    "detail": "fn"
+  },
+  {
+    "value": "XOR(",
+    "detail": "fn"
+  },
+  {
+    "value": "XPATH_STRING(",
+    "detail": "fn"
+  },
+  {
+    "value": "XXHASH3_64(",
+    "detail": "fn"
+  },
+  {
+    "value": "XXHASH_32(",
+    "detail": "fn"
+  },
+  {
+    "value": "XXHASH_64(",
+    "detail": "fn"
+  },
+  {
+    "value": "YEAR(",
+    "detail": "fn"
+  },
+  {
+    "value": "YEARS_ADD(",
+    "detail": "fn"
+  },
+  {
+    "value": "YEARS_DIFF(",
+    "detail": "fn"
+  },
+  {
+    "value": "YEARS_SUB(",
+    "detail": "fn"
+  },
+  {
+    "value": "YEARWEEK(",
+    "detail": "fn"
+  },
+  {
+    "value": "YEAR_CEIL(",
+    "detail": "fn"
+  },
+  {
+    "value": "YEAR_FLOOR(",
+    "detail": "fn"
+  },
+  {
+    "value": "YEAR_MONTH(",
+    "detail": "fn"
+  },
+  {
+    "value": "YEAR_OF_WEEK(",
+    "detail": "fn"
+  },
+  {
+    "value": "YOW(",
+    "detail": "fn"
+  }
+]

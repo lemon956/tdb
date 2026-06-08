@@ -148,3 +148,17 @@ func TestAdapterRejectsWritesForReadOnlyProfile(t *testing.T) {
 		t.Fatalf("Delete error = %v, want ErrReadOnly", err)
 	}
 }
+
+func TestExecuteEnforcesReadOnlyForWrites(t *testing.T) {
+	a := NewWithClient(config.Profile{ReadOnly: true, Database: "app"}, nil)
+	if _, err := a.Execute(context.Background(), db.Command{Text: "db.users.deleteOne({})"}); !errors.Is(err, ErrReadOnly) {
+		t.Fatalf("deleteOne on read-only conn = %v, want ErrReadOnly", err)
+	}
+	if _, err := a.Execute(context.Background(), db.Command{Text: "db.users.insertOne({a:1})"}); !errors.Is(err, ErrReadOnly) {
+		t.Fatalf("insertOne on read-only conn = %v, want ErrReadOnly", err)
+	}
+	// A find passes the read-only gate (then fails on the nil client).
+	if _, err := a.Execute(context.Background(), db.Command{Text: "db.users.find({})"}); errors.Is(err, ErrReadOnly) {
+		t.Fatalf("find on read-only conn must not be rejected as read-only")
+	}
+}

@@ -24,6 +24,12 @@ type ResultView struct {
 	// not Selectable (not focused), so the cursor position stays visible.
 	MarkCursor  bool
 	SelectedRow int
+	// SelectionActive highlights every row in [SelectionStart, SelectionEnd] as a
+	// row-visual ("copy mode") selection. SelectedRow stays the brightest within
+	// the range so the cursor position is still distinguishable.
+	SelectionActive bool
+	SelectionStart  int
+	SelectionEnd    int
 }
 
 func (v *ResultView) Reset() {
@@ -127,9 +133,12 @@ func (v ResultView) renderTable(table result.Table) string {
 			line.WriteString(fitDataTableCell(flattenStatement(table.CellString(row, col)), colWidth[col]))
 		}
 		rowText := line.String()
+		inSelection := v.SelectionActive && row >= v.SelectionStart && row <= v.SelectionEnd
 		switch {
 		case v.Selectable && row == v.SelectedRow:
 			rowText = theme.selected.Render(rowText)
+		case inSelection:
+			rowText = theme.visual.Render(rowText)
 		case v.MarkCursor && row == v.SelectedRow:
 			rowText = theme.selectedDim.Render(rowText)
 		case row%2 == 1:

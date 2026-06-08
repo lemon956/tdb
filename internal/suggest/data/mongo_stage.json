@@ -1,0 +1,134 @@
+[
+  {
+    "value": "$addFields",
+    "detail": "stage"
+  },
+  {
+    "value": "$bucket",
+    "detail": "stage"
+  },
+  {
+    "value": "$bucketAuto",
+    "detail": "stage"
+  },
+  {
+    "value": "$collStats",
+    "detail": "stage"
+  },
+  {
+    "value": "$count",
+    "detail": "stage"
+  },
+  {
+    "value": "$densify",
+    "detail": "stage"
+  },
+  {
+    "value": "$documents",
+    "detail": "stage"
+  },
+  {
+    "value": "$facet",
+    "detail": "stage"
+  },
+  {
+    "value": "$fill",
+    "detail": "stage"
+  },
+  {
+    "value": "$geoNear",
+    "detail": "stage"
+  },
+  {
+    "value": "$graphLookup",
+    "detail": "stage"
+  },
+  {
+    "value": "$group",
+    "detail": "stage"
+  },
+  {
+    "value": "$indexStats",
+    "detail": "stage"
+  },
+  {
+    "value": "$limit",
+    "detail": "stage"
+  },
+  {
+    "value": "$lookup",
+    "detail": "stage"
+  },
+  {
+    "value": "$match",
+    "detail": "stage"
+  },
+  {
+    "value": "$merge",
+    "detail": "stage"
+  },
+  {
+    "value": "$out",
+    "detail": "stage"
+  },
+  {
+    "value": "$project",
+    "detail": "stage"
+  },
+  {
+    "value": "$redact",
+    "detail": "stage"
+  },
+  {
+    "value": "$replaceRoot",
+    "detail": "stage"
+  },
+  {
+    "value": "$replaceWith",
+    "detail": "stage"
+  },
+  {
+    "value": "$sample",
+    "detail": "stage"
+  },
+  {
+    "value": "$search",
+    "detail": "stage"
+  },
+  {
+    "value": "$searchMeta",
+    "detail": "stage"
+  },
+  {
+    "value": "$set",
+    "detail": "stage"
+  },
+  {
+    "value": "$setWindowFields",
+    "detail": "stage"
+  },
+  {
+    "value": "$skip",
+    "detail": "stage"
+  },
+  {
+    "value": "$sort",
+    "detail": "stage"
+  },
+  {
+    "value": "$sortByCount",
+    "detail": "stage"
+  },
+  {
+    "value": "$unionWith",
+    "detail": "stage"
+  },
+  {
+    "value": "$unset",
+    "detail": "stage"
+  },
+  {
+    "value": "$unwind",
+    "detail": "stage"
+  }
+]

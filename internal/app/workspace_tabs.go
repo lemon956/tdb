@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -68,7 +69,11 @@ type workspaceTab struct {
 	ResultAnchorRow         int
 	ResultAnchorColumn      int
 	ResultCursorRow         int  // selected row in a query result list
+	ResultCursorAnchor      int  // anchor row for the result list's row-visual selection
+	ResultPendingG          bool // a leading "g" was pressed in the result/data grid (awaiting "gg")
 	RowDetail               bool // single-row detail subpage open
+	PreviewOffset           int  // data-preview pagination offset
+	PreviewHasMore          bool // another preview page is available
 	Status                  string
 	Error                   string
 	CreatedAtNano           int64
@@ -116,6 +121,8 @@ func (m *Model) openDataWorkspaceTab(target db.Target, set result.Set, mode work
 	tab.SelectionAnchor = 0
 	tab.VimMode = vimModeNormal
 	tab.WorkspaceFocus = workspaceFocusResult
+	tab.PreviewOffset = 0
+	tab.PreviewHasMore = false
 	tab.Status = ""
 	tab.Error = ""
 	m.activeTabIndex = idx
@@ -429,6 +436,18 @@ func (m *Model) workspaceDataContent(tab workspaceTab) string {
 	if mode == vimModeVisual {
 		headerLines = 4
 	}
+	if tab.Mode != workspaceMetadata {
+		n := resultRowCount(tab.Result)
+		more := ""
+		if tab.PreviewHasMore {
+			more = " +more"
+		}
+		status := fmt.Sprintf("rows %d-%d%s  ·  ]/[ page", tab.PreviewOffset+1, tab.PreviewOffset+n, more)
+		// Clip to the content width so a narrow pane never overflows.
+		status = cellSlice(status, 0, m.workspaceContentWidth())
+		b.WriteString(defaultTheme().muted.Render(status) + "\n")
+		headerLines++
+	}
 	b.WriteString(m.renderDataResultViewport(tab, m.workspaceContentWidth(), m.workspaceResultViewportHeight(headerLines)))
 	return b.String()
 }
@@ -488,6 +507,13 @@ func (m *Model) workspaceQueryContent(tab workspaceTab) string {
 		b.WriteString(m.renderDataResultViewport(tab, m.workspaceContentWidth(), m.queryResultViewportHeight(&tab)))
 		return b.String()
 	}
+	if tab.Result.Table == nil {
+		// Non-table results (Redis scalar / JSON value) reuse the data grid so the
+		// char cursor and visual selection ("copy mode") render the same as the
+		// sidebar data-browse page.
+		b.WriteString(m.renderDataResultViewport(tab, m.workspaceContentWidth(), m.queryResultViewportHeight(&tab)))
+		return b.String()
+	}
 	view := tab.ResultView
 	if view.Height == 0 {
 		view.Height = 12
@@ -496,12 +522,16 @@ func (m *Model) workspaceQueryContent(tab workspaceTab) string {
 		view.Width = 8
 	}
 	view.MaxWidth = m.workspaceContentWidth()
-	if tab.Result.Table != nil && len(tab.Result.Table.Rows) > 0 {
+	if len(tab.Result.Table.Rows) > 0 {
 		view.Selectable = m.focus == FocusMain && tab.WorkspaceFocus == workspaceFocusResult
 		// Always mark the current row so its position stays visible (dim when the
 		// result pane is not focused, bright when it is).
 		view.MarkCursor = true
 		view.SelectedRow = tab.ResultCursorRow
+		if view.Selectable && tab.VimMode == vimModeVisual {
+			view.SelectionActive = true
+			view.SelectionStart, view.SelectionEnd = m.queryResultSelectionRows(&tab)
+		}
 	}
 	b.WriteString(view.Render(tab.Result))
 	return b.String()
@@ -515,10 +545,30 @@ func (m *Model) queryResultBar(tab workspaceTab) string {
 		total := len(tab.Result.Table.Rows)
 		label = fmt.Sprintf("Row %d/%d  ·  Esc back · h/l scroll · y copy", tab.ResultCursorRow+1, total)
 	} else if m.focus == FocusMain && tab.WorkspaceFocus == workspaceFocusResult {
-		label = "Results ◀  Enter: view row"
+		selectable := tab.Result.Table != nil && len(tab.Result.Table.Rows) > 0
+		switch {
+		case selectable && tab.VimMode == vimModeVisual:
+			start, end := m.queryResultSelectionRows(&tab)
+			label = fmt.Sprintf("VISUAL  %d rows  ·  y copy · Esc cancel", end-start+1)
+		case selectable:
+			label = "Results ◀  Enter: view row · v select · y copy · gg/G top/bottom"
+		default:
+			label = "Results ◀  v select · y copy · gg/G top/bottom"
+		}
+	}
+	if tab.Result.Truncated {
+		label += fmt.Sprintf("  ⚠ capped at %d rows (refine your query)", resultRowCount(tab.Result))
 	}
 	width := max(8, m.workspaceContentWidth()-1)
 	return defaultTheme().resultBar.Width(width).Render("▌ " + label)
+}
+
+// resultRowCount returns how many rows/documents a result set currently holds.
+func resultRowCount(set result.Set) int {
+	if set.Table != nil {
+		return len(set.Table.Rows)
+	}
+	return len(set.Documents)
 }
 
 func (m *Model) queryEmptyResultMessage(tab workspaceTab) string {
@@ -605,6 +655,9 @@ func (m *Model) renderQueryBuffer(tab workspaceTab) string {
 	var b strings.Builder
 	buffer := tab.QueryBuffer
 	showCursor := m.focus == FocusMain && tab.WorkspaceFocus == workspaceFocusEditor
+	// Syntax classes drive coloring; precedence is visual selection > cursor cell
+	// > token color > plain text.
+	classes := highlightClasses(m.activeDriver(), buffer)
 	// Walk by rune so multi-byte UTF-8 (e.g. CJK) is emitted whole; slicing
 	// per-byte would write broken UTF-8 fragments and corrupt the terminal.
 	for pos := 0; pos < len(buffer); {
@@ -616,10 +669,15 @@ func (m *Model) renderQueryBuffer(tab workspaceTab) string {
 		}
 		_, size := utf8.DecodeRuneInString(buffer[pos:])
 		ch := buffer[pos : pos+size]
-		if showCursor && pos == cursor {
+		switch {
+		case showCursor && pos == cursor:
 			b.WriteString(m.renderCursorCell(ch))
-		} else {
-			b.WriteString(ch)
+		default:
+			if style, ok := m.synStyle(theme, classes[pos]); ok {
+				b.WriteString(style.Render(ch))
+			} else {
+				b.WriteString(ch)
+			}
 		}
 		pos += size
 	}
@@ -669,6 +727,35 @@ func querySuggestionPopupLabel(item suggest.Suggestion) string {
 func queryCursorRow(buffer string, cursor int) int {
 	row, _ := queryCursorPosition(buffer, cursor)
 	return row
+}
+
+// queryCursorVisualPos returns the cursor's VISUAL row/column inside the rendered
+// editor block, accounting for the soft-wrap the queryInput block applies at
+// `width`. This keeps the suggestion popup anchored under the cursor even when a
+// long query line wraps onto several screen rows.
+func (m *Model) queryCursorVisualPos(tab workspaceTab, width int) (int, int) {
+	if width < 1 {
+		width = 1
+	}
+	buffer := tab.QueryBuffer
+	row, col := queryCursorPosition(buffer, tab.QueryCursor)
+	runLines := queryRunButtonLines(buffer)
+	lines := strings.Split(buffer, "\n")
+	prefixWidth := func(line int) int {
+		base := "  "
+		if line == 0 {
+			base = m.workspaceCursor(workspaceFocusEditor, tab)
+		}
+		return lipgloss.Width(queryEditorLinePrefix(base, runLines[line]))
+	}
+	vrow := 0
+	for l := 0; l < row && l < len(lines); l++ {
+		lineW := prefixWidth(l) + lipgloss.Width(lines[l])
+		vrow += max(1, (lineW+width-1)/width) // ceil
+	}
+	off := prefixWidth(row) + col
+	vrow += off / width
+	return vrow, off % width
 }
 
 func queryCursorPosition(buffer string, cursor int) (int, int) {
@@ -784,6 +871,14 @@ func (m *Model) executeQueryInActiveTab(ctx context.Context, line string) {
 }
 
 func (m *Model) applyQueryResult(tabID, line, database, profileID, driver string, res result.Set, err error, dur time.Duration, start time.Time) {
+	// A user-cancelled query is not a failure: don't flash an error box or log it.
+	if errors.Is(err, context.Canceled) {
+		m.message = "query cancelled"
+		return
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		err = fmt.Errorf("query timed out after %s — use `:timeout <seconds>` to extend (0 = none) or press Esc to cancel", m.queryTimeout)
+	}
 	status := history.StatusOK
 	errText := ""
 	if idx := m.findWorkspaceTab(tabID); idx >= 0 {
@@ -791,9 +886,17 @@ func (m *Model) applyQueryResult(tabID, line, database, profileID, driver string
 		if err != nil {
 			tab.Error = err.Error()
 		} else {
+			// Document results (mongo find/aggregate) stay as Documents so they
+			// render as pretty JSON in the data viewport — the same style as the
+			// sidebar data-browse page — with a char cursor and v/y copy.
 			tab.Result = res
 			tab.ResultView.Reset()
 			tab.ResultCursorRow = 0
+			tab.ResultCursorAnchor = 0
+			tab.ResultRow = 0
+			tab.ResultColumn = 0
+			tab.ResultAnchorRow = 0
+			tab.ResultAnchorColumn = 0
 			tab.RowDetail = false
 			tab.Error = ""
 			tab.Status = "ok"
@@ -853,7 +956,7 @@ func (m *Model) executeQueryLine(ctx context.Context, tab *workspaceTab, line, d
 		database = m.selectedDB
 	}
 	start := time.Now()
-	opCtx, cancel := dbContext(ctx)
+	opCtx, cancel := m.dbContext(ctx)
 	res, err := m.adapter.Execute(opCtx, db.Command{Text: line, Database: database})
 	cancel()
 	status := history.StatusOK

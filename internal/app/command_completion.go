@@ -19,7 +19,12 @@ var globalCommandSuggestions = []suggest.Suggestion{
 	{Value: "refresh", Detail: "refresh active view"},
 	{Value: "back", Detail: "go back"},
 	{Value: "db", Detail: "expand database"},
-	{Value: "next", Detail: "next Redis scan page"},
+	{Value: "next", Detail: "next page"},
+	{Value: "prev", Detail: "previous page"},
+	{Value: "export", Detail: "export result: csv|json [path]"},
+	{Value: "copy", Detail: "copy result: csv|json"},
+	{Value: "timeout", Detail: "query timeout seconds (0=none)"},
+	{Value: "q", Detail: "quit"},
 }
 
 func (m *Model) openCommandSuggestions() {

@@ -131,12 +131,23 @@ func (a *Adapter) Preview(ctx context.Context, target db.Target, query db.Query,
 	if a.db == nil {
 		return result.Set{}, ErrNoDatabase
 	}
-	rows, err := a.db.QueryContext(ctx, BuildPreviewSQL(target, page))
+	// Fetch one extra row so we can tell the UI whether a next page exists.
+	probe := page
+	if probe.Limit > 0 {
+		probe.Limit++
+	}
+	rows, err := a.db.QueryContext(ctx, BuildPreviewSQL(target, probe))
 	if err != nil {
 		return result.Set{}, err
 	}
 	defer rows.Close()
-	return rowsToSet(rows)
+	set, err := rowsToSet(rows, page.Limit)
+	if err != nil {
+		return result.Set{}, err
+	}
+	set.HasMore = set.Truncated // the extra row means another page is available
+	set.Truncated = false
+	return set, nil
 }
 
 func (a *Adapter) Metadata(ctx context.Context, target db.Target) (db.ObjectMetadata, error) {
@@ -186,10 +197,15 @@ func (a *Adapter) Delete(ctx context.Context, target db.Target, key db.Key) (res
 }
 
 func (a *Adapter) Execute(ctx context.Context, command db.Command) (result.Set, error) {
+	statement := strings.TrimSpace(command.Text)
+	// Enforce read-only: a non-row statement is a write/DDL and is rejected on a
+	// read-only connection (this is the editor/command-line execution path).
+	if a.profile.ReadOnly && !isRowStatement(statement) {
+		return result.Set{}, ErrReadOnly
+	}
 	if a.db == nil {
 		return result.Set{}, ErrNoDatabase
 	}
-	statement := strings.TrimSpace(command.Text)
 	if command.Database != "" {
 		conn, err := a.db.Conn(ctx)
 		if err != nil {
@@ -216,7 +232,7 @@ func (a *Adapter) executeOn(ctx context.Context, runner sqlRunner, statement str
 			return result.Set{}, err
 		}
 		defer rows.Close()
-		return rowsToSet(rows)
+		return rowsToSet(rows, db.MaxResultRows)
 	}
 	mutation, err := execMutationOn(ctx, runner, statement)
 	if err != nil {
@@ -343,7 +359,10 @@ func sortedKeys(values map[string]any) []string {
 	return keys
 }
 
-func rowsToSet(rows *sql.Rows) (result.Set, error) {
+// rowsToSet materializes rows, reading at most limit rows. If the result has more
+// than limit rows, the extra rows are not read and the Set is marked Truncated
+// (limit <= 0 means no cap). This bounds memory for arbitrary queries.
+func rowsToSet(rows *sql.Rows, limit int) (result.Set, error) {
 	columns, err := rows.Columns()
 	if err != nil {
 		return result.Set{}, err
@@ -358,7 +377,12 @@ func rowsToSet(rows *sql.Rows) (result.Set, error) {
 		table.Columns[i] = result.Column{Name: name, Type: columnType}
 	}
 
+	truncated := false
 	for rows.Next() {
+		if limit > 0 && len(table.Rows) >= limit {
+			truncated = true // there is at least one more row than we kept
+			break
+		}
 		values := make([]any, len(columns))
 		pointers := make([]any, len(columns))
 		for i := range values {
@@ -372,7 +396,7 @@ func rowsToSet(rows *sql.Rows) (result.Set, error) {
 	if err := rows.Err(); err != nil {
 		return result.Set{}, err
 	}
-	return result.Set{Table: &table}, nil
+	return result.Set{Table: &table, Truncated: truncated}, nil
 }
 
 func (a *Adapter) metadataFields(ctx context.Context, query string) ([]db.MetadataField, error) {

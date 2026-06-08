@@ -62,11 +62,21 @@ func TestSuggestMongoFieldsAndOperatorsInsideDocument(t *testing.T) {
 	fieldMatches := Suggest(Context{Driver: config.DriverMongo, Input: "db.lp_pay_exposure.find({roo", Fields: fields})
 	assertValues(t, fieldMatches, []string{"room_id"})
 
+	// The operator lists are vendored from the official source (alphabetical), so
+	// assert membership rather than a fixed order.
 	queryOps := Suggest(Context{Driver: config.DriverMongo, Input: "db.lp_pay_exposure.find({room_id: {$", Fields: fields})
-	assertValues(t, queryOps, []string{"$eq", "$in", "$gt"})
+	for _, op := range []string{"$eq", "$in", "$gt", "$gte", "$lt", "$ne"} {
+		if !containsValue(queryOps, op) {
+			t.Fatalf("query operators missing %s: %+v", op, queryOps)
+		}
+	}
 
 	updateOps := Suggest(Context{Driver: config.DriverMongo, Input: "db.lp_pay_exposure.updateOne({room_id: 1}, {$", Fields: fields})
-	assertValues(t, updateOps, []string{"$set", "$unset", "$inc"})
+	for _, op := range []string{"$set", "$unset", "$inc", "$push"} {
+		if !containsValue(updateOps, op) {
+			t.Fatalf("update operators missing %s: %+v", op, updateOps)
+		}
+	}
 }
 
 func TestSuggestSQLBuiltinFunctions(t *testing.T) {
@@ -190,6 +200,28 @@ func assertValues(t *testing.T, suggestions []Suggestion, want []string) {
 	for i, value := range want {
 		if suggestions[i].Value != value {
 			t.Fatalf("suggestion[%d] = %q, want %q; all=%+v", i, suggestions[i].Value, value, suggestions)
+		}
+	}
+}
+
+func TestVendoredDataIsComprehensive(t *testing.T) {
+	cases := []struct {
+		name string
+		ctx  Context
+		want []string
+	}{
+		{"mongo stages", Context{Driver: config.DriverMongo, Input: "db.c.aggregate([{ $"}, []string{"$densify", "$setWindowFields", "$unionWith"}},
+		{"mongo expr", Context{Driver: config.DriverMongo, Input: "db.c.aggregate([{ $group: { x: { $"}, []string{"$dateToString", "$reduce", "$sum"}},
+		{"redis", Context{Driver: config.DriverRedis, Input: "X"}, []string{"XADD", "XLEN", "XREAD"}},
+		{"mysql fn", Context{Driver: config.DriverMySQL, Input: "SELECT JSON"}, []string{"JSON_TABLE(", "JSON_EXTRACT("}},
+		{"doris fn", Context{Driver: config.DriverDoris, Input: "SELECT BITMAP"}, []string{"BITMAP_UNION("}},
+	}
+	for _, c := range cases {
+		got := Suggest(c.ctx)
+		for _, w := range c.want {
+			if !containsValue(got, w) {
+				t.Fatalf("%s: missing %q", c.name, w)
+			}
 		}
 	}
 }

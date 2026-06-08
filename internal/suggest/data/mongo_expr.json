@@ -1,0 +1,578 @@
+[
+  {
+    "value": "$abs",
+    "detail": "expr:arith"
+  },
+  {
+    "value": "$accumulator",
+    "detail": "expr:arith"
+  },
+  {
+    "value": "$add",
+    "detail": "expr:arith"
+  },
+  {
+    "value": "$addToSet",
+    "detail": "accumulator"
+  },
+  {
+    "value": "$allElementsTrue",
+    "detail": "expr:set"
+  },
+  {
+    "value": "$and",
+    "detail": "expr:bool"
+  },
+  {
+    "value": "$anyElementTrue",
+    "detail": "expr:set"
+  },
+  {
+    "value": "$arrayElemAt",
+    "detail": "expr:array"
+  },
+  {
+    "value": "$arrayToObject",
+    "detail": "expr:array"
+  },
+  {
+    "value": "$avg",
+    "detail": "accumulator"
+  },
+  {
+    "value": "$binarySize",
+    "detail": "expr:obj"
+  },
+  {
+    "value": "$bottom",
+    "detail": "accumulator:bottom-n"
+  },
+  {
+    "value": "$bottomN",
+    "detail": "accumulator:bottom-n"
+  },
+  {
+    "value": "$bsonSize",
+    "detail": "expr:obj"
+  },
+  {
+    "value": "$ceil",
+    "detail": "expr:arith"
+  },
+  {
+    "value": "$cmp",
+    "detail": "expr:comp"
+  },
+  {
+    "value": "$concat",
+    "detail": "expr:string"
+  },
+  {
+    "value": "$concatArrays",
+    "detail": "expr:array"
+  },
+  {
+    "value": "$cond",
+    "detail": "expr:cond"
+  },
+  {
+    "value": "$convert",
+    "detail": "conv"
+  },
+  {
+    "value": "$count",
+    "detail": "accumulator"
+  },
+  {
+    "value": "$covariancePop",
+    "detail": "accumulator:window"
+  },
+  {
+    "value": "$covarianceSamp",
+    "detail": "accumulator:window"
+  },
+  {
+    "value": "$dateAdd",
+    "detail": "expr:date"
+  },
+  {
+    "value": "$dateDiff",
+    "detail": "expr:date"
+  },
+  {
+    "value": "$dateFromParts",
+    "detail": "expr:date"
+  },
+  {
+    "value": "$dateFromString",
+    "detail": "expr:date"
+  },
+  {
+    "value": "$dateSubtract",
+    "detail": "expr:date"
+  },
+  {
+    "value": "$dateToParts",
+    "detail": "expr:date"
+  },
+  {
+    "value": "$dateToString",
+    "detail": "expr:date"
+  },
+  {
+    "value": "$dateTrunc",
+    "detail": "expr:date"
+  },
+  {
+    "value": "$dayOfMonth",
+    "detail": "expr:date"
+  },
+  {
+    "value": "$dayOfWeek",
+    "detail": "expr:date"
+  },
+  {
+    "value": "$dayOfYear",
+    "detail": "expr:date"
+  },
+  {
+    "value": "$denseRank",
+    "detail": "accumulator:window"
+  },
+  {
+    "value": "$derivative",
+    "detail": "accumulator:window"
+  },
+  {
+    "value": "$divide",
+    "detail": "expr:arith"
+  },
+  {
+    "value": "$documentNumber",
+    "detail": "accumulator:window"
+  },
+  {
+    "value": "$eq",
+    "detail": "expr:comp"
+  },
+  {
+    "value": "$exp",
+    "detail": "expr:arith"
+  },
+  {
+    "value": "$expMovingAvg",
+    "detail": "accumulator:window"
+  },
+  {
+    "value": "$filter",
+    "detail": "expr:array"
+  },
+  {
+    "value": "$first",
+    "detail": "expr:array"
+  },
+  {
+    "value": "$firstN",
+    "detail": "accumulator"
+  },
+  {
+    "value": "$floor",
+    "detail": "expr:arith"
+  },
+  {
+    "value": "$function",
+    "detail": "expr:arith"
+  },
+  {
+    "value": "$getField",
+    "detail": "expr:get"
+  },
+  {
+    "value": "$gt",
+    "detail": "expr:comp"
+  },
+  {
+    "value": "$gte",
+    "detail": "expr:comp"
+  },
+  {
+    "value": "$hour",
+    "detail": "expr:date"
+  },
+  {
+    "value": "$ifNull",
+    "detail": "expr:cond"
+  },
+  {
+    "value": "$in",
+    "detail": "expr:array"
+  },
+  {
+    "value": "$indexOfArray",
+    "detail": "expr:array"
+  },
+  {
+    "value": "$indexOfBytes",
+    "detail": "expr:string"
+  },
+  {
+    "value": "$indexOfCP",
+    "detail": "expr:string"
+  },
+  {
+    "value": "$integral",
+    "detail": "accumulator:window"
+  },
+  {
+    "value": "$isArray",
+    "detail": "expr:array"
+  },
+  {
+    "value": "$isNumber",
+    "detail": "expr:arith"
+  },
+  {
+    "value": "$isoDayOfWeek",
+    "detail": "expr:date"
+  },
+  {
+    "value": "$isoWeek",
+    "detail": "expr:date"
+  },
+  {
+    "value": "$isoWeekYear",
+    "detail": "expr:date"
+  },
+  {
+    "value": "$last",
+    "detail": "expr:array"
+  },
+  {
+    "value": "$lastN",
+    "detail": "accumulator"
+  },
+  {
+    "value": "$let",
+    "detail": "expr:var"
+  },
+  {
+    "value": "$linearFill",
+    "detail": "accumulator:window"
+  },
+  {
+    "value": "$literal",
+    "detail": "expr:literal"
+  },
+  {
+    "value": "$ln",
+    "detail": "expr:arith"
+  },
+  {
+    "value": "$locf",
+    "detail": "accumulator:window"
+  },
+  {
+    "value": "$log",
+    "detail": "expr:arith"
+  },
+  {
+    "value": "$log10",
+    "detail": "expr:arith"
+  },
+  {
+    "value": "$lt",
+    "detail": "expr:comp"
+  },
+  {
+    "value": "$lte",
+    "detail": "expr:comp"
+  },
+  {
+    "value": "$ltrim",
+    "detail": "accumulator"
+  },
+  {
+    "value": "$map",
+    "detail": "expr:array"
+  },
+  {
+    "value": "$max",
+    "detail": "accumulator"
+  },
+  {
+    "value": "$maxN",
+    "detail": "accumulator"
+  },
+  {
+    "value": "$mergeObjects",
+    "detail": "expr:obj"
+  },
+  {
+    "value": "$meta",
+    "detail": "expr:text"
+  },
+  {
+    "value": "$millisecond",
+    "detail": "expr:date"
+  },
+  {
+    "value": "$min",
+    "detail": "accumulator"
+  },
+  {
+    "value": "$minN",
+    "detail": "accumulator"
+  },
+  {
+    "value": "$minute",
+    "detail": "expr:date"
+  },
+  {
+    "value": "$mod",
+    "detail": "expr:arith"
+  },
+  {
+    "value": "$month",
+    "detail": "expr:date"
+  },
+  {
+    "value": "$multiply",
+    "detail": "expr:arith"
+  },
+  {
+    "value": "$new",
+    "detail": "expr:comp"
+  },
+  {
+    "value": "$not",
+    "detail": "expr:bool"
+  },
+  {
+    "value": "$objectToArray",
+    "detail": "expr:array"
+  },
+  {
+    "value": "$or",
+    "detail": "expr:bool"
+  },
+  {
+    "value": "$pow",
+    "detail": "expr:arith"
+  },
+  {
+    "value": "$push",
+    "detail": "accumulator"
+  },
+  {
+    "value": "$range",
+    "detail": "expr:array"
+  },
+  {
+    "value": "$rank",
+    "detail": "accumulator:window"
+  },
+  {
+    "value": "$reduce",
+    "detail": "expr:array"
+  },
+  {
+    "value": "$regexFind",
+    "detail": "expr:regex"
+  },
+  {
+    "value": "$regexFindAll",
+    "detail": "expr:regex"
+  },
+  {
+    "value": "$regexMatch",
+    "detail": "expr:regex"
+  },
+  {
+    "value": "$replaceAll",
+    "detail": "expr:string"
+  },
+  {
+    "value": "$replaceOne",
+    "detail": "expr:string"
+  },
+  {
+    "value": "$reverseArray",
+    "detail": "expr:array"
+  },
+  {
+    "value": "$rtrim",
+    "detail": "accumulator"
+  },
+  {
+    "value": "$second",
+    "detail": "expr:date"
+  },
+  {
+    "value": "$setDifference",
+    "detail": "expr:set"
+  },
+  {
+    "value": "$setEquals",
+    "detail": "expr:set"
+  },
+  {
+    "value": "$setIntersection",
+    "detail": "expr:set"
+  },
+  {
+    "value": "$setIsSubset",
+    "detail": "expr:set"
+  },
+  {
+    "value": "$setUnion",
+    "detail": "expr:set"
+  },
+  {
+    "value": "$shift",
+    "detail": "accumulator:window"
+  },
+  {
+    "value": "$size",
+    "detail": "expr:array"
+  },
+  {
+    "value": "$slice",
+    "detail": "expr:array"
+  },
+  {
+    "value": "$sortArray",
+    "detail": "expr:array"
+  },
+  {
+    "value": "$split",
+    "detail": "expr:string"
+  },
+  {
+    "value": "$sqrt",
+    "detail": "expr:arith"
+  },
+  {
+    "value": "$stdDevPop",
+    "detail": "accumulator"
+  },
+  {
+    "value": "$stdDevSamp",
+    "detail": "accumulator"
+  },
+  {
+    "value": "$strLenBytes",
+    "detail": "expr:string"
+  },
+  {
+    "value": "$strLenCP",
+    "detail": "expr:string"
+  },
+  {
+    "value": "$strcasecmp",
+    "detail": "expr:string"
+  },
+  {
+    "value": "$substr",
+    "detail": "expr:string"
+  },
+  {
+    "value": "$substrBytes",
+    "detail": "expr:string"
+  },
+  {
+    "value": "$substrCP",
+    "detail": "expr:string"
+  },
+  {
+    "value": "$subtract",
+    "detail": "expr:arith"
+  },
+  {
+    "value": "$sum",
+    "detail": "accumulator"
+  },
+  {
+    "value": "$switch",
+    "detail": "expr:cond"
+  },
+  {
+    "value": "$toBool",
+    "detail": "conv"
+  },
+  {
+    "value": "$toDate",
+    "detail": "conv"
+  },
+  {
+    "value": "$toDecimal",
+    "detail": "conv"
+  },
+  {
+    "value": "$toDouble",
+    "detail": "conv"
+  },
+  {
+    "value": "$toInt",
+    "detail": "conv"
+  },
+  {
+    "value": "$toLong",
+    "detail": "conv"
+  },
+  {
+    "value": "$toLower",
+    "detail": "expr:string"
+  },
+  {
+    "value": "$toObjectId",
+    "detail": "conv"
+  },
+  {
+    "value": "$toString",
+    "detail": "conv"
+  },
+  {
+    "value": "$toUpper",
+    "detail": "expr:string"
+  },
+  {
+    "value": "$top",
+    "detail": "accumulator:top-n"
+  },
+  {
+    "value": "$topN",
+    "detail": "accumulator:top-n"
+  },
+  {
+    "value": "$trim",
+    "detail": "accumulator"
+  },
+  {
+    "value": "$trunc",
+    "detail": "expr:arith"
+  },
+  {
+    "value": "$tsIncrement",
+    "detail": "expr:date"
+  },
+  {
+    "value": "$tsSecond",
+    "detail": "expr:date"
+  },
+  {
+    "value": "$type",
+    "detail": "expr:type"
+  },
+  {
+    "value": "$week",
+    "detail": "expr:date"
+  },
+  {
+    "value": "$year",
+    "detail": "expr:date"
+  },
+  {
+    "value": "$zip",
+    "detail": "expr:array"
+  }
+]

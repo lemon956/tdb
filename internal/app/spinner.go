@@ -47,7 +47,7 @@ func (m *Model) spinnerView() string {
 		return ""
 	}
 	frame := spinnerFrames[m.loading.frame%len(spinnerFrames)]
-	return defaultTheme().spinner.Render(frame) + " " + m.loading.label
+	return defaultTheme().spinner.Render(frame) + " " + m.loading.label + defaultTheme().muted.Render(" (Esc cancel)")
 }
 
 // runAsync starts a background operation: it marks the spinner active and
@@ -56,18 +56,37 @@ func (m *Model) spinnerView() string {
 // only I/O and must not touch the model; the returned message is applied on the
 // main goroutine.
 func (m *Model) runAsync(label string, work func(context.Context) tea.Msg) tea.Cmd {
+	// Build the cancellable context on the main loop and stash its cancel func so a
+	// keypress can abort the in-flight operation (Esc).
+	if m.cancelOp != nil {
+		m.cancelOp()
+	}
+	ctx, cancel := m.dbContext(context.Background())
+	m.cancelOp = cancel
 	m.loading = loadingState{active: true, label: label}
 	// The spinner tick already runs continuously (started in Init), so we only
 	// return the I/O job. Bubble Tea runs it on a goroutine; tests can invoke it
 	// synchronously to apply the result.
 	return func() tea.Msg {
-		ctx, cancel := dbContext(context.Background())
 		defer cancel()
 		return work(ctx)
 	}
 }
 
+// cancelActiveOp aborts the in-flight async operation, if any.
+func (m *Model) cancelActiveOp() bool {
+	if m.cancelOp == nil || !m.loading.active {
+		return false
+	}
+	m.cancelOp()
+	m.cancelOp = nil
+	m.loading = loadingState{}
+	m.message = "cancelled"
+	return true
+}
+
 // finishLoading clears the spinner once an async result has been applied.
 func (m *Model) finishLoading() {
 	m.loading = loadingState{}
+	m.cancelOp = nil
 }

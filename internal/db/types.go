@@ -56,6 +56,11 @@ type Target struct {
 	Type     ObjectType `json:"type"`
 }
 
+// MaxResultRows bounds how many rows any single arbitrary query loads into
+// memory, so a huge SELECT cannot freeze or OOM the TUI. Results beyond this are
+// dropped and the Set is marked Truncated.
+const MaxResultRows = 10000
+
 type Page struct {
 	Limit  int `json:"limit"`
 	Offset int `json:"offset"`

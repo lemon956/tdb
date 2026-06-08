@@ -87,6 +87,15 @@ type appTheme struct {
 	rowAlt       lipgloss.Style
 	spinner      lipgloss.Style
 
+	// Syntax highlighting (query editor).
+	synKeyword  lipgloss.Style
+	synFunction lipgloss.Style
+	synString   lipgloss.Style
+	synNumber   lipgloss.Style
+	synComment  lipgloss.Style
+	synVariable lipgloss.Style
+	synPunct    lipgloss.Style
+
 	// Centralized panel focus colors (formerly inline literals).
 	sidebarFocusBg, sidebarFocusEdge lipgloss.Color
 	mainFocusBg, mainFocusEdge       lipgloss.Color
@@ -182,6 +191,14 @@ func defaultTheme() appTheme {
 		hintLabel:    lipgloss.NewStyle().Foreground(lipgloss.Color(colMuted)),
 		rowAlt:       lipgloss.NewStyle().Background(lipgloss.Color(colBgAlt)),
 		spinner:      lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(colAccent)),
+
+		synKeyword:  lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#C792EA")), // violet
+		synFunction: lipgloss.NewStyle().Foreground(lipgloss.Color("#82AAFF")),            // blue
+		synString:   lipgloss.NewStyle().Foreground(lipgloss.Color("#C3E88D")),            // green
+		synNumber:   lipgloss.NewStyle().Foreground(lipgloss.Color("#F78C6C")),            // orange
+		synComment:  lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("#5F7488")),
+		synVariable: lipgloss.NewStyle().Foreground(lipgloss.Color("#FFCB6B")), // amber ($-ops)
+		synPunct:    lipgloss.NewStyle().Foreground(lipgloss.Color(colMuted)),
 
 		sidebarFocusBg:   lipgloss.Color(colSidebarFocusBg),
 		sidebarFocusEdge: lipgloss.Color(colSidebarFocusEdge),

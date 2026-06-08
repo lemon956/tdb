@@ -1,0 +1,1482 @@
+[
+  {
+    "value": "ACL",
+    "detail": "server"
+  },
+  {
+    "value": "ACL CAT",
+    "detail": "server"
+  },
+  {
+    "value": "ACL DELUSER",
+    "detail": "server"
+  },
+  {
+    "value": "ACL DRYRUN",
+    "detail": "server"
+  },
+  {
+    "value": "ACL GENPASS",
+    "detail": "server"
+  },
+  {
+    "value": "ACL GETUSER",
+    "detail": "server"
+  },
+  {
+    "value": "ACL HELP",
+    "detail": "server"
+  },
+  {
+    "value": "ACL LIST",
+    "detail": "server"
+  },
+  {
+    "value": "ACL LOAD",
+    "detail": "server"
+  },
+  {
+    "value": "ACL LOG",
+    "detail": "server"
+  },
+  {
+    "value": "ACL SAVE",
+    "detail": "server"
+  },
+  {
+    "value": "ACL SETUSER",
+    "detail": "server"
+  },
+  {
+    "value": "ACL USERS",
+    "detail": "server"
+  },
+  {
+    "value": "ACL WHOAMI",
+    "detail": "server"
+  },
+  {
+    "value": "APPEND",
+    "detail": "string"
+  },
+  {
+    "value": "ASKING",
+    "detail": "cluster"
+  },
+  {
+    "value": "AUTH",
+    "detail": "connection"
+  },
+  {
+    "value": "BGREWRITEAOF",
+    "detail": "server"
+  },
+  {
+    "value": "BGSAVE",
+    "detail": "server"
+  },
+  {
+    "value": "BITCOUNT",
+    "detail": "bitmap"
+  },
+  {
+    "value": "BITFIELD",
+    "detail": "bitmap"
+  },
+  {
+    "value": "BITFIELD_RO",
+    "detail": "bitmap"
+  },
+  {
+    "value": "BITOP",
+    "detail": "bitmap"
+  },
+  {
+    "value": "BITPOS",
+    "detail": "bitmap"
+  },
+  {
+    "value": "BLMOVE",
+    "detail": "list"
+  },
+  {
+    "value": "BLMPOP",
+    "detail": "list"
+  },
+  {
+    "value": "BLPOP",
+    "detail": "list"
+  },
+  {
+    "value": "BRPOP",
+    "detail": "list"
+  },
+  {
+    "value": "BRPOPLPUSH",
+    "detail": "list"
+  },
+  {
+    "value": "BZMPOP",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "BZPOPMAX",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "BZPOPMIN",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "CLIENT",
+    "detail": "connection"
+  },
+  {
+    "value": "CLIENT CACHING",
+    "detail": "connection"
+  },
+  {
+    "value": "CLIENT GETNAME",
+    "detail": "connection"
+  },
+  {
+    "value": "CLIENT GETREDIR",
+    "detail": "connection"
+  },
+  {
+    "value": "CLIENT HELP",
+    "detail": "connection"
+  },
+  {
+    "value": "CLIENT ID",
+    "detail": "connection"
+  },
+  {
+    "value": "CLIENT INFO",
+    "detail": "connection"
+  },
+  {
+    "value": "CLIENT KILL",
+    "detail": "connection"
+  },
+  {
+    "value": "CLIENT LIST",
+    "detail": "connection"
+  },
+  {
+    "value": "CLIENT NO-EVICT",
+    "detail": "connection"
+  },
+  {
+    "value": "CLIENT NO-TOUCH",
+    "detail": "connection"
+  },
+  {
+    "value": "CLIENT PAUSE",
+    "detail": "connection"
+  },
+  {
+    "value": "CLIENT REPLY",
+    "detail": "connection"
+  },
+  {
+    "value": "CLIENT SETINFO",
+    "detail": "connection"
+  },
+  {
+    "value": "CLIENT SETNAME",
+    "detail": "connection"
+  },
+  {
+    "value": "CLIENT TRACKING",
+    "detail": "connection"
+  },
+  {
+    "value": "CLIENT TRACKINGINFO",
+    "detail": "connection"
+  },
+  {
+    "value": "CLIENT UNBLOCK",
+    "detail": "connection"
+  },
+  {
+    "value": "CLIENT UNPAUSE",
+    "detail": "connection"
+  },
+  {
+    "value": "CLUSTER",
+    "detail": "cluster"
+  },
+  {
+    "value": "CLUSTER ADDSLOTS",
+    "detail": "cluster"
+  },
+  {
+    "value": "CLUSTER ADDSLOTSRANGE",
+    "detail": "cluster"
+  },
+  {
+    "value": "CLUSTER BUMPEPOCH",
+    "detail": "cluster"
+  },
+  {
+    "value": "CLUSTER COUNT-FAILURE-REPORTS",
+    "detail": "cluster"
+  },
+  {
+    "value": "CLUSTER COUNTKEYSINSLOT",
+    "detail": "cluster"
+  },
+  {
+    "value": "CLUSTER DELSLOTS",
+    "detail": "cluster"
+  },
+  {
+    "value": "CLUSTER DELSLOTSRANGE",
+    "detail": "cluster"
+  },
+  {
+    "value": "CLUSTER FAILOVER",
+    "detail": "cluster"
+  },
+  {
+    "value": "CLUSTER FLUSHSLOTS",
+    "detail": "cluster"
+  },
+  {
+    "value": "CLUSTER FORGET",
+    "detail": "cluster"
+  },
+  {
+    "value": "CLUSTER GETKEYSINSLOT",
+    "detail": "cluster"
+  },
+  {
+    "value": "CLUSTER HELP",
+    "detail": "cluster"
+  },
+  {
+    "value": "CLUSTER INFO",
+    "detail": "cluster"
+  },
+  {
+    "value": "CLUSTER KEYSLOT",
+    "detail": "cluster"
+  },
+  {
+    "value": "CLUSTER LINKS",
+    "detail": "cluster"
+  },
+  {
+    "value": "CLUSTER MEET",
+    "detail": "cluster"
+  },
+  {
+    "value": "CLUSTER MYID",
+    "detail": "cluster"
+  },
+  {
+    "value": "CLUSTER MYSHARDID",
+    "detail": "cluster"
+  },
+  {
+    "value": "CLUSTER NODES",
+    "detail": "cluster"
+  },
+  {
+    "value": "CLUSTER REPLICAS",
+    "detail": "cluster"
+  },
+  {
+    "value": "CLUSTER REPLICATE",
+    "detail": "cluster"
+  },
+  {
+    "value": "CLUSTER RESET",
+    "detail": "cluster"
+  },
+  {
+    "value": "CLUSTER SAVECONFIG",
+    "detail": "cluster"
+  },
+  {
+    "value": "CLUSTER SET-CONFIG-EPOCH",
+    "detail": "cluster"
+  },
+  {
+    "value": "CLUSTER SETSLOT",
+    "detail": "cluster"
+  },
+  {
+    "value": "CLUSTER SHARDS",
+    "detail": "cluster"
+  },
+  {
+    "value": "CLUSTER SLAVES",
+    "detail": "cluster"
+  },
+  {
+    "value": "CLUSTER SLOTS",
+    "detail": "cluster"
+  },
+  {
+    "value": "COMMAND",
+    "detail": "server"
+  },
+  {
+    "value": "COMMAND COUNT",
+    "detail": "server"
+  },
+  {
+    "value": "COMMAND DOCS",
+    "detail": "server"
+  },
+  {
+    "value": "COMMAND GETKEYS",
+    "detail": "server"
+  },
+  {
+    "value": "COMMAND GETKEYSANDFLAGS",
+    "detail": "server"
+  },
+  {
+    "value": "COMMAND HELP",
+    "detail": "server"
+  },
+  {
+    "value": "COMMAND INFO",
+    "detail": "server"
+  },
+  {
+    "value": "COMMAND LIST",
+    "detail": "server"
+  },
+  {
+    "value": "CONFIG",
+    "detail": "server"
+  },
+  {
+    "value": "CONFIG GET",
+    "detail": "server"
+  },
+  {
+    "value": "CONFIG HELP",
+    "detail": "server"
+  },
+  {
+    "value": "CONFIG RESETSTAT",
+    "detail": "server"
+  },
+  {
+    "value": "CONFIG REWRITE",
+    "detail": "server"
+  },
+  {
+    "value": "CONFIG SET",
+    "detail": "server"
+  },
+  {
+    "value": "COPY",
+    "detail": "generic"
+  },
+  {
+    "value": "DBSIZE",
+    "detail": "server"
+  },
+  {
+    "value": "DEBUG",
+    "detail": "server"
+  },
+  {
+    "value": "DECR",
+    "detail": "string"
+  },
+  {
+    "value": "DECRBY",
+    "detail": "string"
+  },
+  {
+    "value": "DEL",
+    "detail": "generic"
+  },
+  {
+    "value": "DISCARD",
+    "detail": "transactions"
+  },
+  {
+    "value": "DUMP",
+    "detail": "generic"
+  },
+  {
+    "value": "ECHO",
+    "detail": "connection"
+  },
+  {
+    "value": "EVAL",
+    "detail": "scripting"
+  },
+  {
+    "value": "EVALSHA",
+    "detail": "scripting"
+  },
+  {
+    "value": "EVALSHA_RO",
+    "detail": "scripting"
+  },
+  {
+    "value": "EVAL_RO",
+    "detail": "scripting"
+  },
+  {
+    "value": "EXEC",
+    "detail": "transactions"
+  },
+  {
+    "value": "EXISTS",
+    "detail": "generic"
+  },
+  {
+    "value": "EXPIRE",
+    "detail": "generic"
+  },
+  {
+    "value": "EXPIREAT",
+    "detail": "generic"
+  },
+  {
+    "value": "EXPIRETIME",
+    "detail": "generic"
+  },
+  {
+    "value": "FAILOVER",
+    "detail": "server"
+  },
+  {
+    "value": "FCALL",
+    "detail": "scripting"
+  },
+  {
+    "value": "FCALL_RO",
+    "detail": "scripting"
+  },
+  {
+    "value": "FLUSHALL",
+    "detail": "server"
+  },
+  {
+    "value": "FLUSHDB",
+    "detail": "server"
+  },
+  {
+    "value": "FUNCTION",
+    "detail": "scripting"
+  },
+  {
+    "value": "FUNCTION DELETE",
+    "detail": "scripting"
+  },
+  {
+    "value": "FUNCTION DUMP",
+    "detail": "scripting"
+  },
+  {
+    "value": "FUNCTION FLUSH",
+    "detail": "scripting"
+  },
+  {
+    "value": "FUNCTION HELP",
+    "detail": "scripting"
+  },
+  {
+    "value": "FUNCTION KILL",
+    "detail": "scripting"
+  },
+  {
+    "value": "FUNCTION LIST",
+    "detail": "scripting"
+  },
+  {
+    "value": "FUNCTION LOAD",
+    "detail": "scripting"
+  },
+  {
+    "value": "FUNCTION RESTORE",
+    "detail": "scripting"
+  },
+  {
+    "value": "FUNCTION STATS",
+    "detail": "scripting"
+  },
+  {
+    "value": "GEOADD",
+    "detail": "geo"
+  },
+  {
+    "value": "GEODIST",
+    "detail": "geo"
+  },
+  {
+    "value": "GEOHASH",
+    "detail": "geo"
+  },
+  {
+    "value": "GEOPOS",
+    "detail": "geo"
+  },
+  {
+    "value": "GEORADIUS",
+    "detail": "geo"
+  },
+  {
+    "value": "GEORADIUSBYMEMBER",
+    "detail": "geo"
+  },
+  {
+    "value": "GEORADIUSBYMEMBER_RO",
+    "detail": "geo"
+  },
+  {
+    "value": "GEORADIUS_RO",
+    "detail": "geo"
+  },
+  {
+    "value": "GEOSEARCH",
+    "detail": "geo"
+  },
+  {
+    "value": "GEOSEARCHSTORE",
+    "detail": "geo"
+  },
+  {
+    "value": "GET",
+    "detail": "string"
+  },
+  {
+    "value": "GETBIT",
+    "detail": "bitmap"
+  },
+  {
+    "value": "GETDEL",
+    "detail": "string"
+  },
+  {
+    "value": "GETEX",
+    "detail": "string"
+  },
+  {
+    "value": "GETRANGE",
+    "detail": "string"
+  },
+  {
+    "value": "GETSET",
+    "detail": "string"
+  },
+  {
+    "value": "HDEL",
+    "detail": "hash"
+  },
+  {
+    "value": "HELLO",
+    "detail": "connection"
+  },
+  {
+    "value": "HEXISTS",
+    "detail": "hash"
+  },
+  {
+    "value": "HGET",
+    "detail": "hash"
+  },
+  {
+    "value": "HGETALL",
+    "detail": "hash"
+  },
+  {
+    "value": "HINCRBY",
+    "detail": "hash"
+  },
+  {
+    "value": "HINCRBYFLOAT",
+    "detail": "hash"
+  },
+  {
+    "value": "HKEYS",
+    "detail": "hash"
+  },
+  {
+    "value": "HLEN",
+    "detail": "hash"
+  },
+  {
+    "value": "HMGET",
+    "detail": "hash"
+  },
+  {
+    "value": "HMSET",
+    "detail": "hash"
+  },
+  {
+    "value": "HRANDFIELD",
+    "detail": "hash"
+  },
+  {
+    "value": "HSCAN",
+    "detail": "hash"
+  },
+  {
+    "value": "HSET",
+    "detail": "hash"
+  },
+  {
+    "value": "HSETNX",
+    "detail": "hash"
+  },
+  {
+    "value": "HSTRLEN",
+    "detail": "hash"
+  },
+  {
+    "value": "HVALS",
+    "detail": "hash"
+  },
+  {
+    "value": "INCR",
+    "detail": "string"
+  },
+  {
+    "value": "INCRBY",
+    "detail": "string"
+  },
+  {
+    "value": "INCRBYFLOAT",
+    "detail": "string"
+  },
+  {
+    "value": "INFO",
+    "detail": "server"
+  },
+  {
+    "value": "KEYS",
+    "detail": "generic"
+  },
+  {
+    "value": "LASTSAVE",
+    "detail": "server"
+  },
+  {
+    "value": "LATENCY",
+    "detail": "server"
+  },
+  {
+    "value": "LATENCY DOCTOR",
+    "detail": "server"
+  },
+  {
+    "value": "LATENCY GRAPH",
+    "detail": "server"
+  },
+  {
+    "value": "LATENCY HELP",
+    "detail": "server"
+  },
+  {
+    "value": "LATENCY HISTOGRAM",
+    "detail": "server"
+  },
+  {
+    "value": "LATENCY HISTORY",
+    "detail": "server"
+  },
+  {
+    "value": "LATENCY LATEST",
+    "detail": "server"
+  },
+  {
+    "value": "LATENCY RESET",
+    "detail": "server"
+  },
+  {
+    "value": "LCS",
+    "detail": "string"
+  },
+  {
+    "value": "LINDEX",
+    "detail": "list"
+  },
+  {
+    "value": "LINSERT",
+    "detail": "list"
+  },
+  {
+    "value": "LLEN",
+    "detail": "list"
+  },
+  {
+    "value": "LMOVE",
+    "detail": "list"
+  },
+  {
+    "value": "LMPOP",
+    "detail": "list"
+  },
+  {
+    "value": "LOLWUT",
+    "detail": "server"
+  },
+  {
+    "value": "LPOP",
+    "detail": "list"
+  },
+  {
+    "value": "LPOS",
+    "detail": "list"
+  },
+  {
+    "value": "LPUSH",
+    "detail": "list"
+  },
+  {
+    "value": "LPUSHX",
+    "detail": "list"
+  },
+  {
+    "value": "LRANGE",
+    "detail": "list"
+  },
+  {
+    "value": "LREM",
+    "detail": "list"
+  },
+  {
+    "value": "LSET",
+    "detail": "list"
+  },
+  {
+    "value": "LTRIM",
+    "detail": "list"
+  },
+  {
+    "value": "MEMORY",
+    "detail": "server"
+  },
+  {
+    "value": "MEMORY DOCTOR",
+    "detail": "server"
+  },
+  {
+    "value": "MEMORY HELP",
+    "detail": "server"
+  },
+  {
+    "value": "MEMORY MALLOC-STATS",
+    "detail": "server"
+  },
+  {
+    "value": "MEMORY PURGE",
+    "detail": "server"
+  },
+  {
+    "value": "MEMORY STATS",
+    "detail": "server"
+  },
+  {
+    "value": "MEMORY USAGE",
+    "detail": "server"
+  },
+  {
+    "value": "MGET",
+    "detail": "string"
+  },
+  {
+    "value": "MIGRATE",
+    "detail": "generic"
+  },
+  {
+    "value": "MODULE",
+    "detail": "server"
+  },
+  {
+    "value": "MODULE HELP",
+    "detail": "server"
+  },
+  {
+    "value": "MODULE LIST",
+    "detail": "server"
+  },
+  {
+    "value": "MODULE LOAD",
+    "detail": "server"
+  },
+  {
+    "value": "MODULE LOADEX",
+    "detail": "server"
+  },
+  {
+    "value": "MODULE UNLOAD",
+    "detail": "server"
+  },
+  {
+    "value": "MONITOR",
+    "detail": "server"
+  },
+  {
+    "value": "MOVE",
+    "detail": "generic"
+  },
+  {
+    "value": "MSET",
+    "detail": "string"
+  },
+  {
+    "value": "MSETNX",
+    "detail": "string"
+  },
+  {
+    "value": "MULTI",
+    "detail": "transactions"
+  },
+  {
+    "value": "OBJECT",
+    "detail": "generic"
+  },
+  {
+    "value": "OBJECT ENCODING",
+    "detail": "generic"
+  },
+  {
+    "value": "OBJECT FREQ",
+    "detail": "generic"
+  },
+  {
+    "value": "OBJECT HELP",
+    "detail": "generic"
+  },
+  {
+    "value": "OBJECT IDLETIME",
+    "detail": "generic"
+  },
+  {
+    "value": "OBJECT REFCOUNT",
+    "detail": "generic"
+  },
+  {
+    "value": "PERSIST",
+    "detail": "generic"
+  },
+  {
+    "value": "PEXPIRE",
+    "detail": "generic"
+  },
+  {
+    "value": "PEXPIREAT",
+    "detail": "generic"
+  },
+  {
+    "value": "PEXPIRETIME",
+    "detail": "generic"
+  },
+  {
+    "value": "PFADD",
+    "detail": "hyperloglog"
+  },
+  {
+    "value": "PFCOUNT",
+    "detail": "hyperloglog"
+  },
+  {
+    "value": "PFDEBUG",
+    "detail": "hyperloglog"
+  },
+  {
+    "value": "PFMERGE",
+    "detail": "hyperloglog"
+  },
+  {
+    "value": "PFSELFTEST",
+    "detail": "hyperloglog"
+  },
+  {
+    "value": "PING",
+    "detail": "connection"
+  },
+  {
+    "value": "PSETEX",
+    "detail": "string"
+  },
+  {
+    "value": "PSUBSCRIBE",
+    "detail": "pubsub"
+  },
+  {
+    "value": "PSYNC",
+    "detail": "server"
+  },
+  {
+    "value": "PTTL",
+    "detail": "generic"
+  },
+  {
+    "value": "PUBLISH",
+    "detail": "pubsub"
+  },
+  {
+    "value": "PUBSUB",
+    "detail": "pubsub"
+  },
+  {
+    "value": "PUBSUB CHANNELS",
+    "detail": "pubsub"
+  },
+  {
+    "value": "PUBSUB HELP",
+    "detail": "pubsub"
+  },
+  {
+    "value": "PUBSUB NUMPAT",
+    "detail": "pubsub"
+  },
+  {
+    "value": "PUBSUB NUMSUB",
+    "detail": "pubsub"
+  },
+  {
+    "value": "PUBSUB SHARDCHANNELS",
+    "detail": "pubsub"
+  },
+  {
+    "value": "PUBSUB SHARDNUMSUB",
+    "detail": "pubsub"
+  },
+  {
+    "value": "PUNSUBSCRIBE",
+    "detail": "pubsub"
+  },
+  {
+    "value": "QUIT",
+    "detail": "connection"
+  },
+  {
+    "value": "RANDOMKEY",
+    "detail": "generic"
+  },
+  {
+    "value": "READONLY",
+    "detail": "cluster"
+  },
+  {
+    "value": "READWRITE",
+    "detail": "cluster"
+  },
+  {
+    "value": "RENAME",
+    "detail": "generic"
+  },
+  {
+    "value": "RENAMENX",
+    "detail": "generic"
+  },
+  {
+    "value": "REPLCONF",
+    "detail": "server"
+  },
+  {
+    "value": "REPLICAOF",
+    "detail": "server"
+  },
+  {
+    "value": "RESET",
+    "detail": "connection"
+  },
+  {
+    "value": "RESTORE",
+    "detail": "generic"
+  },
+  {
+    "value": "RESTORE-ASKING",
+    "detail": "server"
+  },
+  {
+    "value": "ROLE",
+    "detail": "server"
+  },
+  {
+    "value": "RPOP",
+    "detail": "list"
+  },
+  {
+    "value": "RPOPLPUSH",
+    "detail": "list"
+  },
+  {
+    "value": "RPUSH",
+    "detail": "list"
+  },
+  {
+    "value": "RPUSHX",
+    "detail": "list"
+  },
+  {
+    "value": "SADD",
+    "detail": "set"
+  },
+  {
+    "value": "SAVE",
+    "detail": "server"
+  },
+  {
+    "value": "SCAN",
+    "detail": "generic"
+  },
+  {
+    "value": "SCARD",
+    "detail": "set"
+  },
+  {
+    "value": "SCRIPT",
+    "detail": "scripting"
+  },
+  {
+    "value": "SCRIPT DEBUG",
+    "detail": "scripting"
+  },
+  {
+    "value": "SCRIPT EXISTS",
+    "detail": "scripting"
+  },
+  {
+    "value": "SCRIPT FLUSH",
+    "detail": "scripting"
+  },
+  {
+    "value": "SCRIPT HELP",
+    "detail": "scripting"
+  },
+  {
+    "value": "SCRIPT KILL",
+    "detail": "scripting"
+  },
+  {
+    "value": "SCRIPT LOAD",
+    "detail": "scripting"
+  },
+  {
+    "value": "SDIFF",
+    "detail": "set"
+  },
+  {
+    "value": "SDIFFSTORE",
+    "detail": "set"
+  },
+  {
+    "value": "SELECT",
+    "detail": "connection"
+  },
+  {
+    "value": "SET",
+    "detail": "string"
+  },
+  {
+    "value": "SETBIT",
+    "detail": "bitmap"
+  },
+  {
+    "value": "SETEX",
+    "detail": "string"
+  },
+  {
+    "value": "SETNX",
+    "detail": "string"
+  },
+  {
+    "value": "SETRANGE",
+    "detail": "string"
+  },
+  {
+    "value": "SHUTDOWN",
+    "detail": "server"
+  },
+  {
+    "value": "SINTER",
+    "detail": "set"
+  },
+  {
+    "value": "SINTERCARD",
+    "detail": "set"
+  },
+  {
+    "value": "SINTERSTORE",
+    "detail": "set"
+  },
+  {
+    "value": "SISMEMBER",
+    "detail": "set"
+  },
+  {
+    "value": "SLAVEOF",
+    "detail": "server"
+  },
+  {
+    "value": "SLOWLOG",
+    "detail": "server"
+  },
+  {
+    "value": "SLOWLOG GET",
+    "detail": "server"
+  },
+  {
+    "value": "SLOWLOG HELP",
+    "detail": "server"
+  },
+  {
+    "value": "SLOWLOG LEN",
+    "detail": "server"
+  },
+  {
+    "value": "SLOWLOG RESET",
+    "detail": "server"
+  },
+  {
+    "value": "SMEMBERS",
+    "detail": "set"
+  },
+  {
+    "value": "SMISMEMBER",
+    "detail": "set"
+  },
+  {
+    "value": "SMOVE",
+    "detail": "set"
+  },
+  {
+    "value": "SORT",
+    "detail": "generic"
+  },
+  {
+    "value": "SORT_RO",
+    "detail": "generic"
+  },
+  {
+    "value": "SPOP",
+    "detail": "set"
+  },
+  {
+    "value": "SPUBLISH",
+    "detail": "pubsub"
+  },
+  {
+    "value": "SRANDMEMBER",
+    "detail": "set"
+  },
+  {
+    "value": "SREM",
+    "detail": "set"
+  },
+  {
+    "value": "SSCAN",
+    "detail": "set"
+  },
+  {
+    "value": "SSUBSCRIBE",
+    "detail": "pubsub"
+  },
+  {
+    "value": "STRLEN",
+    "detail": "string"
+  },
+  {
+    "value": "SUBSCRIBE",
+    "detail": "pubsub"
+  },
+  {
+    "value": "SUBSTR",
+    "detail": "string"
+  },
+  {
+    "value": "SUNION",
+    "detail": "set"
+  },
+  {
+    "value": "SUNIONSTORE",
+    "detail": "set"
+  },
+  {
+    "value": "SUNSUBSCRIBE",
+    "detail": "pubsub"
+  },
+  {
+    "value": "SWAPDB",
+    "detail": "server"
+  },
+  {
+    "value": "SYNC",
+    "detail": "server"
+  },
+  {
+    "value": "TIME",
+    "detail": "server"
+  },
+  {
+    "value": "TOUCH",
+    "detail": "generic"
+  },
+  {
+    "value": "TTL",
+    "detail": "generic"
+  },
+  {
+    "value": "TYPE",
+    "detail": "generic"
+  },
+  {
+    "value": "UNLINK",
+    "detail": "generic"
+  },
+  {
+    "value": "UNSUBSCRIBE",
+    "detail": "pubsub"
+  },
+  {
+    "value": "UNWATCH",
+    "detail": "transactions"
+  },
+  {
+    "value": "WAIT",
+    "detail": "generic"
+  },
+  {
+    "value": "WAITAOF",
+    "detail": "generic"
+  },
+  {
+    "value": "WATCH",
+    "detail": "transactions"
+  },
+  {
+    "value": "XACK",
+    "detail": "stream"
+  },
+  {
+    "value": "XADD",
+    "detail": "stream"
+  },
+  {
+    "value": "XAUTOCLAIM",
+    "detail": "stream"
+  },
+  {
+    "value": "XCLAIM",
+    "detail": "stream"
+  },
+  {
+    "value": "XDEL",
+    "detail": "stream"
+  },
+  {
+    "value": "XGROUP",
+    "detail": "stream"
+  },
+  {
+    "value": "XGROUP CREATE",
+    "detail": "stream"
+  },
+  {
+    "value": "XGROUP CREATECONSUMER",
+    "detail": "stream"
+  },
+  {
+    "value": "XGROUP DELCONSUMER",
+    "detail": "stream"
+  },
+  {
+    "value": "XGROUP DESTROY",
+    "detail": "stream"
+  },
+  {
+    "value": "XGROUP HELP",
+    "detail": "stream"
+  },
+  {
+    "value": "XGROUP SETID",
+    "detail": "stream"
+  },
+  {
+    "value": "XINFO",
+    "detail": "stream"
+  },
+  {
+    "value": "XINFO CONSUMERS",
+    "detail": "stream"
+  },
+  {
+    "value": "XINFO GROUPS",
+    "detail": "stream"
+  },
+  {
+    "value": "XINFO HELP",
+    "detail": "stream"
+  },
+  {
+    "value": "XINFO STREAM",
+    "detail": "stream"
+  },
+  {
+    "value": "XLEN",
+    "detail": "stream"
+  },
+  {
+    "value": "XPENDING",
+    "detail": "stream"
+  },
+  {
+    "value": "XRANGE",
+    "detail": "stream"
+  },
+  {
+    "value": "XREAD",
+    "detail": "stream"
+  },
+  {
+    "value": "XREADGROUP",
+    "detail": "stream"
+  },
+  {
+    "value": "XREVRANGE",
+    "detail": "stream"
+  },
+  {
+    "value": "XSETID",
+    "detail": "stream"
+  },
+  {
+    "value": "XTRIM",
+    "detail": "stream"
+  },
+  {
+    "value": "ZADD",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "ZCARD",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "ZCOUNT",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "ZDIFF",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "ZDIFFSTORE",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "ZINCRBY",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "ZINTER",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "ZINTERCARD",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "ZINTERSTORE",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "ZLEXCOUNT",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "ZMPOP",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "ZMSCORE",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "ZPOPMAX",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "ZPOPMIN",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "ZRANDMEMBER",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "ZRANGE",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "ZRANGEBYLEX",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "ZRANGEBYSCORE",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "ZRANGESTORE",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "ZRANK",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "ZREM",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "ZREMRANGEBYLEX",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "ZREMRANGEBYRANK",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "ZREMRANGEBYSCORE",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "ZREVRANGE",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "ZREVRANGEBYLEX",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "ZREVRANGEBYSCORE",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "ZREVRANK",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "ZSCAN",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "ZSCORE",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "ZUNION",
+    "detail": "sorted-set"
+  },
+  {
+    "value": "ZUNIONSTORE",
+    "detail": "sorted-set"
+  }
+]

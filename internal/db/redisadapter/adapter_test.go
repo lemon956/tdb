@@ -64,3 +64,17 @@ func TestAdapterRejectsWritesForReadOnlyProfile(t *testing.T) {
 		t.Fatalf("Insert error = %v, want ErrReadOnly", err)
 	}
 }
+
+func TestExecuteEnforcesReadOnlyForWrites(t *testing.T) {
+	a := NewWithClient(config.Profile{ReadOnly: true}, nil)
+	if _, err := a.Execute(context.Background(), db.Command{Text: "DEL k"}); !errors.Is(err, ErrReadOnly) {
+		t.Fatalf("DEL on read-only conn = %v, want ErrReadOnly", err)
+	}
+	if _, err := a.Execute(context.Background(), db.Command{Text: "SET k v"}); !errors.Is(err, ErrReadOnly) {
+		t.Fatalf("SET on read-only conn = %v, want ErrReadOnly", err)
+	}
+	// A read command passes the read-only gate (then fails on the nil client).
+	if _, err := a.Execute(context.Background(), db.Command{Text: "GET k"}); errors.Is(err, ErrReadOnly) {
+		t.Fatalf("GET on read-only conn must not be rejected as read-only")
+	}
+}

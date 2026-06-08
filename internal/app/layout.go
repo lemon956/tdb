@@ -555,6 +555,14 @@ func (m *Model) helpPanelContent() string {
 			"Redis: Redis commands",
 			"Mongo: JSON query fragments",
 		}},
+		{"Results & export", []string{
+			"next / prev: page through data (offset)",
+			"] / [: next / previous page in the data view",
+			"export csv|json [path]: write result to a file",
+			"copy csv|json: copy the whole result to the clipboard",
+			"Esc: cancel a running query",
+			"timeout <seconds>: query timeout (0 = none)",
+		}},
 	}
 	query := strings.ToLower(strings.TrimSpace(m.helpSearch))
 	var b strings.Builder
