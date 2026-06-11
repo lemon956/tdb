@@ -3,8 +3,6 @@ package app
 import (
 	"path/filepath"
 	"testing"
-
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 func TestMouseClickCancelClearsPendingAction(t *testing.T) {
@@ -13,8 +11,7 @@ func TestMouseClickCancelClearsPendingAction(t *testing.T) {
 	model.pending = &pendingAction{Kind: "delete-profile", ProfileID: "local"}
 	model.hitboxes = HitboxRegistry{{ID: "confirm-cancel", X: 3, Y: 3, Width: 10, Height: 1, Focus: FocusContext, Action: actionCancel}}
 
-	updated, _ := model.Update(tea.MouseMsg{X: 4, Y: 3, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
-	got := updated.(*Model)
+	got := leftClick(model, 4, 3).(*Model)
 	if got.pending != nil {
 		t.Fatalf("pending action not cleared: %+v", got.pending)
 	}

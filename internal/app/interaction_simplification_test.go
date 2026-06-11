@@ -150,8 +150,7 @@ func TestMouseClickClosesErrorPanel(t *testing.T) {
 		t.Fatalf("missing error close hitbox: %+v", model.hitboxes)
 	}
 
-	updated, _ := model.Update(tea.MouseMsg{X: closeHit.X, Y: closeHit.Y, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
-	got := updated.(*Model)
+	got := leftClick(model, closeHit.X, closeHit.Y).(*Model)
 	if got.errBox != nil {
 		t.Fatalf("errBox = %+v, want nil", got.errBox)
 	}
@@ -170,8 +169,8 @@ func TestFocusedPanelUsesColorWithoutTitleText(t *testing.T) {
 			t.Fatalf("panel title %q should be hidden:\n%s", unwanted, view)
 		}
 	}
-	if !strings.Contains(view, "no saved profiles") {
-		t.Fatalf("sidebar content missing after hiding title:\n%s", view)
+	if !strings.Contains(view, "No connections.") {
+		t.Fatalf("connections popup content missing:\n%s", view)
 	}
 }
 

@@ -29,6 +29,7 @@ const (
 )
 
 type IconSet struct {
+	Catalog    string
 	Database   string
 	Collection string
 	Metadata   string
@@ -158,6 +159,7 @@ func IconSetForStyle(style IconStyle) IconSet {
 	switch style {
 	case IconStyleNerd:
 		set := typeIcons
+		set.Catalog = "" // nf-fa-sitemap: a catalog groups databases
 		set.Database = ""
 		set.Collection = ""
 		set.Metadata = ""
@@ -171,6 +173,7 @@ func IconSetForStyle(style IconStyle) IconSet {
 		return set
 	default:
 		set := typeIcons
+		set.Catalog = "❖"
 		set.Database = "◆"
 		set.Collection = "◇"
 		set.Metadata = "▪"

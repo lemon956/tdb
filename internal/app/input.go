@@ -2,6 +2,7 @@ package app
 
 import (
 	"strings"
+	"unicode/utf8"
 
 	"tdb/internal/suggest"
 )
@@ -76,7 +77,21 @@ func (i *CommandInput) Backspace() {
 	if len(i.value) == 0 {
 		return
 	}
-	i.value = i.value[:len(i.value)-1]
+	// Delete the last rune, not the last byte, so a multi-byte character (CJK,
+	// emoji) is removed whole — a byte-wise trim would leave a dangling partial
+	// sequence that renders as `�` and corrupts width-based layout.
+	_, size := utf8.DecodeLastRuneInString(i.value)
+	i.value = i.value[:len(i.value)-size]
+	i.HideSuggestions()
+}
+
+// BackspaceWord deletes the word before the (end-of-input) cursor — bound to
+// Ctrl+Backspace / Alt+Backspace.
+func (i *CommandInput) BackspaceWord() {
+	if len(i.value) == 0 {
+		return
+	}
+	i.value = i.value[:queryPreviousWord(i.value, len(i.value))]
 	i.HideSuggestions()
 }
 
@@ -160,8 +175,10 @@ func (i *CommandInput) AcceptSuggestion() bool {
 	return true
 }
 
+// replaceCurrentToken swaps the identifier run immediately before the cursor with
+// replacement. When the cursor is right after whitespace/punctuation the token is
+// empty, so the replacement is appended (e.g. "select * from " → "...from users").
 func replaceCurrentToken(input, replacement string) string {
-	input = strings.TrimRight(input, " \t\n")
 	start := len(input)
 	for start > 0 {
 		r := input[start-1]

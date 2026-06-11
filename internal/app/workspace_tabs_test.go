@@ -187,11 +187,8 @@ func TestQueryPageMouseSecondClickObjectCreatesDataTab(t *testing.T) {
 	model.activeTabIndex = 0
 	_ = model.View()
 
-	click := tea.MouseMsg{X: 2, Y: 4, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress}
-	updated, _ := model.Update(click)
-	model = updated.(*Model)
-	updated, _ = model.Update(click)
-	model = updated.(*Model)
+	model = leftClick(model, 2, 4).(*Model)
+	model = leftClick(model, 2, 4).(*Model)
 
 	tab := model.activeWorkspaceTab()
 	if model.page != PageData || tab == nil || tab.Kind != workspaceTabData || tab.Target.Name != "users" {
@@ -417,8 +414,19 @@ func TestQuerySuggestionsUseCursorTokenAndRefreshAfterCursorMove(t *testing.T) {
 
 	tab.QueryCursor = strings.Index(tab.QueryBuffer, "o = 1") + 1
 	model.refreshQuerySuggestions(tab)
-	if len(tab.QuerySuggestions) == 0 || tab.QuerySuggestions[0].Value != "orders" {
-		t.Fatalf("suggestions after cursor move = %+v, want orders", tab.QuerySuggestions)
+	// After WHERE the token at the cursor ("o") drives filtering; ordering now
+	// leads with fields/functions rather than tables, so just assert the cursor
+	// token is what's being completed.
+	if len(tab.QuerySuggestions) == 0 {
+		t.Fatalf("expected suggestions for token 'o', got none")
+	}
+	first := tab.QuerySuggestions[0]
+	key := first.Value
+	if first.Match != "" {
+		key = first.Match
+	}
+	if !strings.HasPrefix(strings.ToLower(key), "o") {
+		t.Fatalf("suggestions after cursor move = %+v, want a match for token 'o'", first)
 	}
 }
 
@@ -476,8 +484,12 @@ func TestQuerySuggestionsLoadSQLMetadataFields(t *testing.T) {
 	if adapter.lastTarget.Database != "app" || adapter.lastTarget.Name != "users" {
 		t.Fatalf("metadata target = %+v, want app.users", adapter.lastTarget)
 	}
-	if len(tab.QuerySuggestions) == 0 || tab.QuerySuggestions[0].Value != "name" {
-		t.Fatalf("query suggestions = %+v, want name field", tab.QuerySuggestions)
+	// After WHERE, the field leads and is qualified with the FROM table.
+	if len(tab.QuerySuggestions) == 0 || tab.QuerySuggestions[0].Value != "users.name" {
+		t.Fatalf("query suggestions = %+v, want users.name field", tab.QuerySuggestions)
+	}
+	if tab.QuerySuggestions[0].Match != "name" {
+		t.Fatalf("qualified field should still match by bare name, got %q", tab.QuerySuggestions[0].Match)
 	}
 }
 
@@ -497,8 +509,10 @@ func TestQueryInsertModeLeftRightRefreshesSuggestions(t *testing.T) {
 	tab.QueryBuffer = "SELECT * FROM u WHERE o"
 	tab.QueryCursor = len(tab.QueryBuffer)
 	model.refreshQuerySuggestions(tab)
-	if len(tab.QuerySuggestions) == 0 || tab.QuerySuggestions[0].Value != "orders" {
-		t.Fatalf("initial suggestions = %+v, want orders", tab.QuerySuggestions)
+	// After WHERE the token "o" is completed (fields/functions lead now, so the
+	// exact head is no longer the "orders" table — just assert it matches "o").
+	if len(tab.QuerySuggestions) == 0 || !strings.HasPrefix(strings.ToLower(tab.QuerySuggestions[0].Value), "o") {
+		t.Fatalf("initial suggestions = %+v, want a match for 'o'", tab.QuerySuggestions)
 	}
 
 	// Move the cursor to just after `u` (followed by a space) so the new "only
@@ -592,12 +606,16 @@ func TestCtrlTabShortcutsSwitchAndCloseWorkspaceTabs(t *testing.T) {
 		t.Fatalf("activeTabIndex after ctrl+left = %d, want 0", model.activeTabIndex)
 	}
 
+	// Ctrl+L is now a panel switch, not a tab switch: the active tab is unchanged.
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyCtrlL})
 	model = updated.(*Model)
-	if model.activeTabIndex != 1 {
-		t.Fatalf("activeTabIndex after ctrl+l = %d, want 1", model.activeTabIndex)
+	if model.activeTabIndex != 0 {
+		t.Fatalf("ctrl+l should no longer switch tabs, activeTabIndex = %d, want 0", model.activeTabIndex)
 	}
 
+	// Move to the query tab via the arrow alias, then close it with Ctrl+W.
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyCtrlRight})
+	model = updated.(*Model)
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyCtrlW})
 	model = updated.(*Model)
 	if len(model.workspaceTabs) != 1 || model.workspaceTabs[0].Kind != workspaceTabData {

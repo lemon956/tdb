@@ -26,6 +26,9 @@ type Profile struct {
 
 type Vault struct {
 	Profiles []Profile `json:"profiles"`
+	// AIProvider is the preferred local AI CLI ("claude" or "codex"); empty means
+	// auto-detect from PATH.
+	AIProvider string `json:"ai_provider,omitempty"`
 }
 
 func (v *Vault) UpsertProfile(profile Profile) {

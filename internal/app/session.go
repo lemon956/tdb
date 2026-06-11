@@ -19,6 +19,10 @@ type connSession struct {
 	profile config.Profile
 	adapter db.Adapter
 
+	catalogs            []string
+	expandedCatalogs    map[string]bool
+	catalogDatabases    map[string][]string
+	selectedCatalog     string
 	databases           []string
 	objects             []db.Object
 	databaseObjects     map[string][]db.Object
@@ -56,6 +60,10 @@ func (m *Model) captureSession() connSession {
 	return connSession{
 		profile:             prof,
 		adapter:             m.adapter,
+		catalogs:            m.catalogs,
+		expandedCatalogs:    m.expandedCatalogs,
+		catalogDatabases:    m.catalogDatabases,
+		selectedCatalog:     m.selectedCatalog,
 		databases:           m.databases,
 		objects:             m.objects,
 		databaseObjects:     m.databaseObjects,
@@ -100,6 +108,10 @@ func (m *Model) loadSession(i int) {
 	s := m.sessions[i]
 	m.activeProfile = &m.sessions[i].profile
 	m.adapter = s.adapter
+	m.catalogs = s.catalogs
+	m.expandedCatalogs = s.expandedCatalogs
+	m.catalogDatabases = s.catalogDatabases
+	m.selectedCatalog = s.selectedCatalog
 	m.databases = s.databases
 	m.objects = s.objects
 	m.databaseObjects = s.databaseObjects
@@ -156,6 +168,10 @@ func (m *Model) enterConnectionsManager() {
 	m.activeSession = -1
 	m.activeProfile = nil
 	m.adapter = nil
+	m.catalogs = nil
+	m.expandedCatalogs = map[string]bool{}
+	m.catalogDatabases = map[string][]string{}
+	m.selectedCatalog = ""
 	m.databases = nil
 	m.objects = nil
 	m.databaseObjects = map[string][]db.Object{}

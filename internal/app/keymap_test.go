@@ -12,24 +12,26 @@ import (
 	"tdb/internal/result"
 )
 
-func TestTabAndShiftTabCycleFocus(t *testing.T) {
+// Panel focus now switches with Ctrl+H/Ctrl+L (Tab is reserved for completion).
+func TestCtrlHLCyclePanelFocus(t *testing.T) {
 	model := NewModel(Options{ConfigPath: filepath.Join(t.TempDir(), "tdb.enc")})
 	model.page = PageConnections
 	model.focus = FocusSidebar
 
+	// Tab no longer moves panel focus.
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyTab})
-	if got := updated.(*Model).focus; got != FocusMain {
-		t.Fatalf("focus after tab = %s, want main", got)
-	}
-
-	updated, _ = updated.Update(tea.KeyMsg{Type: tea.KeyTab})
 	if got := updated.(*Model).focus; got != FocusSidebar {
-		t.Fatalf("focus after second tab = %s, want sidebar", got)
+		t.Fatalf("Tab should not change focus, got %s", got)
 	}
 
-	updated, _ = updated.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
+	updated, _ = updated.Update(tea.KeyMsg{Type: tea.KeyCtrlL})
 	if got := updated.(*Model).focus; got != FocusMain {
-		t.Fatalf("focus after shift+tab = %s, want main", got)
+		t.Fatalf("focus after ctrl+l = %s, want main", got)
+	}
+
+	updated, _ = updated.Update(tea.KeyMsg{Type: tea.KeyCtrlH})
+	if got := updated.(*Model).focus; got != FocusSidebar {
+		t.Fatalf("focus after ctrl+h = %s, want sidebar", got)
 	}
 }
 
@@ -116,6 +118,7 @@ func TestBrowserEnterOpensSelectedObject(t *testing.T) {
 	model.selectedDB = "app"
 	model.objects = []db.Object{{Name: "users", Type: db.ObjectTable}, {Name: "orders", Type: db.ObjectTable}}
 	model.objectIndex = 1
+	model.focus = FocusSidebar // Enter opens the sidebar selection only when it's focused
 
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	got := updated.(*Model)

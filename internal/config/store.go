@@ -36,6 +36,14 @@ func NewStore(path string) *Store {
 	return &Store{path: path}
 }
 
+// Exists reports whether an encrypted config file is already present. It is used
+// to tell a first run (set + confirm a new master password) apart from unlocking
+// an existing vault.
+func (s *Store) Exists() bool {
+	_, err := os.Stat(s.path)
+	return err == nil
+}
+
 func (s *Store) Save(masterPassword string, vault Vault) error {
 	if masterPassword == "" {
 		return errors.New("master password is required")

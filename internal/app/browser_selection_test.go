@@ -122,8 +122,7 @@ func TestWorkspaceTabClickSwitchesTab(t *testing.T) {
 	if hit.ID == "" {
 		t.Fatalf("missing workspace-tab:1 hitbox: %+v", model.hitboxes)
 	}
-	updated, _ := model.Update(tea.MouseMsg{X: hit.X, Y: hit.Y, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
-	model = updated.(*Model)
+	model = leftClick(model, hit.X, hit.Y).(*Model)
 	if model.activeTabIndex != 1 || model.focus != FocusMain {
 		t.Fatalf("clicking a tab should activate it and focus main, got idx=%d focus=%s", model.activeTabIndex, model.focus)
 	}
@@ -327,9 +326,8 @@ func TestBrowserViewRegistersDatabaseHitboxAndMouseDoubleClickLoadsObjects(t *te
 		t.Fatalf("missing database hitbox: %+v", model.hitboxes)
 	}
 
-	updated, _ := model.Update(tea.MouseMsg{X: dbHit.X, Y: dbHit.Y, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
-	updated, _ = updated.Update(tea.MouseMsg{X: dbHit.X, Y: dbHit.Y, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
-	got := updated.(*Model)
+	model = leftClick(model, dbHit.X, dbHit.Y).(*Model)
+	got := leftClick(model, dbHit.X, dbHit.Y).(*Model)
 	if got.selectedDB != "app" || len(got.objects) != 1 || got.objects[0].Name != "users" {
 		t.Fatalf("selectedDB/objects = %q/%+v, want app/users", got.selectedDB, got.objects)
 	}

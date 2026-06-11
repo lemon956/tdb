@@ -48,11 +48,17 @@ func (m *Model) handleConnectionDriverKey(msg tea.KeyMsg) {
 	switch msg.String() {
 	case "esc":
 		m.cancelConnectionForm()
-	case "tab", "down", "right":
+	case "tab", "down", "right", "j":
 		m.form.moveDriver(1)
 		m.message = "choose " + string(m.form.selectedDriver())
-	case "shift+tab", "up", "left":
+	case "shift+tab", "up", "left", "k":
 		m.form.moveDriver(-1)
+		m.message = "choose " + string(m.form.selectedDriver())
+	case "g":
+		m.form.driverIndex = 0
+		m.message = "choose " + string(m.form.selectedDriver())
+	case "G":
+		m.form.driverIndex = len(connectionFormDrivers) - 1
 		m.message = "choose " + string(m.form.selectedDriver())
 	case "enter":
 		driver := m.form.selectedDriver()
@@ -85,8 +91,10 @@ func (m *Model) handleConnectionFieldKey(ctx context.Context, msg tea.KeyMsg) {
 		m.form.cursorEnd()
 	case "delete":
 		m.form.deleteForward()
-	case "backspace", "ctrl+h":
+	case "backspace":
 		m.form.backspace()
+	case "ctrl+h", "alt+backspace":
+		m.form.backspaceWord()
 	case " ":
 		if m.form.fieldIndex >= len(m.form.fields) {
 			m.form.readOnly = !m.form.readOnly

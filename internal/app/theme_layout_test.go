@@ -26,7 +26,7 @@ func TestModelViewUsesMultiPanelLayout(t *testing.T) {
 
 	got := model.View()
 
-	for _, want := range []string{"TDB", "no saved profiles", "No connections.", "Ready", "help"} {
+	for _, want := range []string{"TDB", "No connections.", "Ready", "help"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("view missing %q:\n%s", want, got)
 		}

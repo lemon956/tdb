@@ -253,13 +253,17 @@ func (m *Model) openSelected(ctx context.Context) {
 			return
 		}
 		switch node.Kind {
+		case navNodeCatalog:
+			m.toggleCatalog(ctx, node.Catalog)
 		case navNodeDatabase:
-			m.toggleDatabase(ctx, node.DatabaseIdx)
+			m.toggleDatabase(ctx, node.Catalog, node.Database)
 		case navNodeObject:
+			m.selectedCatalog = node.Catalog
 			m.selectedDB = node.Database
 			m.databaseIndex = node.DatabaseIdx
-			m.objects = m.databaseObjects[node.Database]
+			m.objects = m.databaseObjects[m.scopeKey(node.Catalog, node.Database)]
 			m.objectIndex = node.ObjectIdx
+			m.bindActiveQueryTabToSelection()
 			if sameTarget(m.target, node.Target) && m.workspaceMode == workspacePreview {
 				m.openMetadata(ctx, node.Target)
 				return
@@ -274,7 +278,7 @@ func (m *Model) openSelected(ctx context.Context) {
 }
 
 func (m *Model) moveBrowserSelection(delta int) {
-	if len(m.databases) == 0 {
+	if len(m.databases) == 0 && len(m.externalCatalogs()) == 0 {
 		m.objectIndex = clamp(m.objectIndex+delta, 0, max(0, len(m.objects)-1))
 		rootOffset := 0
 		if m.activeProfile != nil {
@@ -289,7 +293,7 @@ func (m *Model) moveBrowserSelection(delta int) {
 		m.browserCursor = m.objectIndex
 		return
 	}
-	if m.activeProfile != nil && len(m.databases) > 0 && m.browserCursor == 0 {
+	if m.activeProfile != nil && len(nodes) > 1 && m.browserCursor == 0 {
 		m.browserCursor = 1
 	}
 	m.browserCursor = clamp(m.browserCursor+delta, 0, len(nodes)-1)
@@ -302,12 +306,16 @@ func (m *Model) syncBrowserSelectionFromCursor() {
 		return
 	}
 	switch node.Kind {
+	case navNodeCatalog:
+		m.selectedCatalog = node.Catalog
 	case navNodeDatabase:
+		m.selectedCatalog = node.Catalog
 		m.databaseIndex = node.DatabaseIdx
 	case navNodeObject, navNodeMeta:
+		m.selectedCatalog = node.Catalog
 		m.databaseIndex = node.DatabaseIdx
 		m.objectIndex = node.ObjectIdx
-		if objects, ok := m.databaseObjects[node.Database]; ok {
+		if objects, ok := m.databaseObjects[m.scopeKey(node.Catalog, node.Database)]; ok {
 			m.objects = objects
 		}
 	}

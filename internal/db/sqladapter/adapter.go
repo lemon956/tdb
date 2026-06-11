@@ -58,7 +58,11 @@ func (a *Adapter) ListDatabases(ctx context.Context) ([]string, error) {
 	if a.db == nil {
 		return nil, ErrNoDatabase
 	}
-	rows, err := a.db.QueryContext(ctx, "SHOW DATABASES")
+	return listDatabasesOn(ctx, a.db)
+}
+
+func listDatabasesOn(ctx context.Context, runner sqlRunner) ([]string, error) {
+	rows, err := runner.QueryContext(ctx, "SHOW DATABASES")
 	if err != nil {
 		return nil, err
 	}
@@ -75,15 +79,123 @@ func (a *Adapter) ListDatabases(ctx context.Context) ([]string, error) {
 	return databases, rows.Err()
 }
 
+// isInternalCatalog reports whether a catalog name refers to Doris's built-in
+// catalog (or no catalog at all, for non-Doris drivers).
+func isInternalCatalog(catalog string) bool {
+	return catalog == "" || strings.EqualFold(catalog, "internal")
+}
+
+// ListCatalogs returns the Doris external catalogs visible to the account. Only
+// Doris exposes catalogs (SHOW CATALOGS is privilege-filtered by the server, so
+// catalogs the account cannot access simply don't appear); every other driver
+// returns nil so the UI keeps its flat database list.
+func (a *Adapter) ListCatalogs(ctx context.Context) ([]string, error) {
+	if a.db == nil {
+		return nil, ErrNoDatabase
+	}
+	if a.profile.Driver != config.DriverDoris {
+		return nil, nil
+	}
+	rows, err := a.db.QueryContext(ctx, "SHOW CATALOGS")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	columns, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
+	nameIdx := -1
+	for i, name := range columns {
+		if strings.Contains(strings.ToLower(name), "catalogname") || strings.Contains(strings.ToLower(name), "catalog_name") {
+			nameIdx = i
+			break
+		}
+	}
+	if nameIdx < 0 && len(columns) > 1 {
+		nameIdx = 1 // SHOW CATALOGS: CatalogId, CatalogName, ...
+	}
+	if nameIdx < 0 {
+		nameIdx = 0
+	}
+	catalogs := []string{}
+	for rows.Next() {
+		values := make([]sql.NullString, len(columns))
+		pointers := make([]any, len(columns))
+		for i := range values {
+			pointers[i] = &values[i]
+		}
+		if err := rows.Scan(pointers...); err != nil {
+			return nil, err
+		}
+		if name := values[nameIdx].String; name != "" {
+			catalogs = append(catalogs, name)
+		}
+	}
+	return catalogs, rows.Err()
+}
+
+// ListDatabasesInCatalog lists the databases inside a Doris catalog. The
+// built-in/internal catalog reuses SHOW DATABASES; an external catalog is
+// scoped via SWITCH on a dedicated connection first.
+func (a *Adapter) ListDatabasesInCatalog(ctx context.Context, catalog string) ([]string, error) {
+	if a.db == nil {
+		return nil, ErrNoDatabase
+	}
+	if isInternalCatalog(catalog) {
+		return listDatabasesOn(ctx, a.db)
+	}
+	conn, err := a.db.Conn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+	if err := useScope(ctx, conn, catalog, ""); err != nil {
+		return nil, err
+	}
+	return listDatabasesOn(ctx, conn)
+}
+
+// useScope applies a Doris catalog/database context onto a connection. An
+// external catalog needs SWITCH; the internal catalog only needs USE.
+func useScope(ctx context.Context, runner sqlRunner, catalog, database string) error {
+	if !isInternalCatalog(catalog) {
+		if _, err := runner.ExecContext(ctx, "SWITCH "+sqlutil.QuoteIdentifier(catalog)); err != nil {
+			return err
+		}
+	}
+	if database != "" {
+		if _, err := runner.ExecContext(ctx, "USE "+sqlutil.QuoteIdentifier(database)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (a *Adapter) ListObjects(ctx context.Context, scope db.Scope) ([]db.Object, error) {
 	if a.db == nil {
 		return nil, ErrNoDatabase
 	}
-	query := "SHOW FULL TABLES"
-	if scope.Database != "" {
-		query += " FROM " + sqlutil.QuoteIdentifier(scope.Database)
+	if !isInternalCatalog(scope.Catalog) {
+		conn, err := a.db.Conn(ctx)
+		if err != nil {
+			return nil, err
+		}
+		defer conn.Close()
+		if err := useScope(ctx, conn, scope.Catalog, ""); err != nil {
+			return nil, err
+		}
+		return listObjectsOn(ctx, conn, scope.Database)
 	}
-	rows, err := a.db.QueryContext(ctx, query)
+	return listObjectsOn(ctx, a.db, scope.Database)
+}
+
+func listObjectsOn(ctx context.Context, runner sqlRunner, database string) ([]db.Object, error) {
+	query := "SHOW FULL TABLES"
+	if database != "" {
+		query += " FROM " + sqlutil.QuoteIdentifier(database)
+	}
+	rows, err := runner.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +238,7 @@ func (a *Adapter) ListObjects(ctx context.Context, scope db.Scope) ([]db.Object,
 
 func (a *Adapter) Preview(ctx context.Context, target db.Target, query db.Query, page db.Page) (result.Set, error) {
 	if query.Text != "" {
-		return a.Execute(ctx, db.Command{Text: query.Text, Database: target.Database})
+		return a.Execute(ctx, db.Command{Text: query.Text, Catalog: target.Catalog, Database: target.Database})
 	}
 	if a.db == nil {
 		return result.Set{}, ErrNoDatabase
@@ -136,30 +248,47 @@ func (a *Adapter) Preview(ctx context.Context, target db.Target, query db.Query,
 	if probe.Limit > 0 {
 		probe.Limit++
 	}
-	rows, err := a.db.QueryContext(ctx, BuildPreviewSQL(target, probe))
-	if err != nil {
-		return result.Set{}, err
-	}
-	defer rows.Close()
-	set, err := rowsToSet(rows, page.Limit)
-	if err != nil {
-		return result.Set{}, err
-	}
-	set.HasMore = set.Truncated // the extra row means another page is available
-	set.Truncated = false
-	return set, nil
+	return a.execScoped(ctx, target.Catalog, target.Database, func(runner sqlRunner) (result.Set, error) {
+		rows, err := runner.QueryContext(ctx, BuildPreviewSQL(target, probe))
+		if err != nil {
+			return result.Set{}, err
+		}
+		defer rows.Close()
+		set, err := rowsToSet(rows, page.Limit)
+		if err != nil {
+			return result.Set{}, err
+		}
+		set.HasMore = set.Truncated // the extra row means another page is available
+		set.Truncated = false
+		return set, nil
+	})
 }
 
 func (a *Adapter) Metadata(ctx context.Context, target db.Target) (db.ObjectMetadata, error) {
 	if a.db == nil {
 		return db.ObjectMetadata{}, ErrNoDatabase
 	}
+	if !isInternalCatalog(target.Catalog) {
+		conn, err := a.db.Conn(ctx)
+		if err != nil {
+			return db.ObjectMetadata{}, err
+		}
+		defer conn.Close()
+		if err := useScope(ctx, conn, target.Catalog, target.Database); err != nil {
+			return db.ObjectMetadata{}, err
+		}
+		return metadataOn(ctx, conn, target)
+	}
+	return metadataOn(ctx, a.db, target)
+}
+
+func metadataOn(ctx context.Context, runner sqlRunner, target db.Target) (db.ObjectMetadata, error) {
 	columnsSQL, indexesSQL := BuildMetadataSQL(target)
-	fields, err := a.metadataFields(ctx, columnsSQL)
+	fields, err := metadataFields(ctx, runner, columnsSQL)
 	if err != nil {
 		return db.ObjectMetadata{}, err
 	}
-	indexes, err := a.metadataIndexes(ctx, indexesSQL)
+	indexes, err := metadataIndexes(ctx, runner, indexesSQL)
 	if err != nil {
 		return db.ObjectMetadata{}, err
 	}
@@ -206,23 +335,84 @@ func (a *Adapter) Execute(ctx context.Context, command db.Command) (result.Set, 
 	if a.db == nil {
 		return result.Set{}, ErrNoDatabase
 	}
-	if command.Database != "" {
-		conn, err := a.db.Conn(ctx)
-		if err != nil {
-			return result.Set{}, err
-		}
-		defer conn.Close()
-		if _, err := conn.ExecContext(ctx, "USE "+sqlutil.QuoteIdentifier(command.Database)); err != nil {
-			return result.Set{}, err
-		}
-		return a.executeOn(ctx, conn, statement)
-	}
-	return a.executeOn(ctx, a.db, statement)
+	return a.execScoped(ctx, command.Catalog, command.Database, func(runner sqlRunner) (result.Set, error) {
+		return a.executeOn(ctx, runner, statement)
+	})
 }
 
 type sqlRunner interface {
 	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
 	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}
+
+// execScoped runs fn with the given Doris catalog/database context applied. When
+// a catalog or database is set the work runs on a dedicated connection (so the
+// SWITCH/USE sticks for that statement); otherwise it uses the shared pool.
+//
+// On Doris, if fn fails because the new pipelineX engine cannot execute the plan
+// (legacy external tables — ENGINE=ELASTICSEARCH/ODBC/MYSQL — yield
+// "Unsupported exec type in pipelineX: *_SCAN_NODE"), it transparently disables
+// the pipelineX engine on a fresh connection and retries once. Normal queries
+// keep running on pipelineX; only the ones that hit the limitation pay the
+// fallback, and no external table needs to be modified.
+func (a *Adapter) execScoped(ctx context.Context, catalog, database string, fn func(sqlRunner) (result.Set, error)) (result.Set, error) {
+	scoped := !isInternalCatalog(catalog) || database != ""
+	var (
+		set result.Set
+		err error
+	)
+	if scoped {
+		set, err = a.runScoped(ctx, catalog, database, false, fn)
+	} else {
+		set, err = fn(a.db)
+	}
+	if a.profile.Driver == config.DriverDoris && isPipelineXUnsupported(err) {
+		return a.runScoped(ctx, catalog, database, true, fn)
+	}
+	return set, err
+}
+
+// runScoped acquires a dedicated connection, optionally disables the pipelineX
+// engine, applies the catalog/database scope, and runs fn on that connection.
+func (a *Adapter) runScoped(ctx context.Context, catalog, database string, disablePipelineX bool, fn func(sqlRunner) (result.Set, error)) (result.Set, error) {
+	conn, err := a.db.Conn(ctx)
+	if err != nil {
+		return result.Set{}, err
+	}
+	defer conn.Close()
+	if disablePipelineX {
+		disablePipelineXEngine(ctx, conn)
+	}
+	if err := useScope(ctx, conn, catalog, database); err != nil {
+		return result.Set{}, err
+	}
+	return fn(conn)
+}
+
+// disablePipelineXEngine turns off the pipelineX execution engine for the
+// session. The variable name changed across Doris versions, so try each and
+// ignore "unknown variable" errors.
+func disablePipelineXEngine(ctx context.Context, runner sqlRunner) {
+	for _, name := range []string{
+		"enable_pipeline_x_engine",
+		"experimental_enable_pipeline_x_engine",
+		"enable_pipeline_engine",
+	} {
+		_, _ = runner.ExecContext(ctx, "SET "+name+" = false")
+	}
+}
+
+// isPipelineXUnsupported matches the Doris error raised when the pipelineX
+// engine has no executor for a plan node (legacy external-table scans).
+func isPipelineXUnsupported(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	if strings.Contains(msg, "unsupported exec type in pipelinex") {
+		return true
+	}
+	return strings.Contains(msg, "pipelinex") && strings.Contains(msg, "scan_node")
 }
 
 func (a *Adapter) executeOn(ctx context.Context, runner sqlRunner, statement string) (result.Set, error) {
@@ -399,8 +589,8 @@ func rowsToSet(rows *sql.Rows, limit int) (result.Set, error) {
 	return result.Set{Table: &table, Truncated: truncated}, nil
 }
 
-func (a *Adapter) metadataFields(ctx context.Context, query string) ([]db.MetadataField, error) {
-	rows, err := a.db.QueryContext(ctx, query)
+func metadataFields(ctx context.Context, runner sqlRunner, query string) ([]db.MetadataField, error) {
+	rows, err := runner.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -422,8 +612,8 @@ func (a *Adapter) metadataFields(ctx context.Context, query string) ([]db.Metada
 	return out, rows.Err()
 }
 
-func (a *Adapter) metadataIndexes(ctx context.Context, query string) ([]db.MetadataIndex, error) {
-	rows, err := a.db.QueryContext(ctx, query)
+func metadataIndexes(ctx context.Context, runner sqlRunner, query string) ([]db.MetadataIndex, error) {
+	rows, err := runner.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -498,11 +688,40 @@ func mutationSet(affectedRows int64) result.Set {
 }
 
 func isRowStatement(statement string) bool {
-	first, _, _ := strings.Cut(strings.ToLower(statement), " ")
-	switch first {
+	statement = stripLeadingSQLComments(statement)
+	fields := strings.Fields(strings.ToLower(statement))
+	if len(fields) == 0 {
+		return false
+	}
+	switch fields[0] {
 	case "select", "show", "describe", "desc", "explain", "with":
 		return true
 	default:
 		return false
+	}
+}
+
+// stripLeadingSQLComments removes leading whitespace and `-- line` / `/* block */`
+// comments so the first real keyword can be classified (AI-formatted SQL often
+// starts with a comment or a newline after the keyword).
+func stripLeadingSQLComments(s string) string {
+	for {
+		s = strings.TrimLeft(s, " \t\r\n")
+		switch {
+		case strings.HasPrefix(s, "--"):
+			if i := strings.IndexByte(s, '\n'); i >= 0 {
+				s = s[i+1:]
+			} else {
+				return ""
+			}
+		case strings.HasPrefix(s, "/*"):
+			if i := strings.Index(s, "*/"); i >= 0 {
+				s = s[i+2:]
+			} else {
+				return ""
+			}
+		default:
+			return s
+		}
 	}
 }

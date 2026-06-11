@@ -83,6 +83,7 @@ func TestNavigationObjectEnterPreviewsThenShowsMetadata(t *testing.T) {
 		t.Fatalf("page/target/previewCalls = %s/%s/%d, want data/users/1", got.page, got.target.Name, adapter.previewCalls)
 	}
 
+	got.focus = FocusSidebar // re-focus the tree before acting on the node again
 	updated, _ = got.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	got = updated.(*Model)
 	if got.workspaceMode != workspaceMetadata || adapter.metadataCalls != 1 {
@@ -109,14 +110,12 @@ func TestNavigationMouseClickSelectsAndDoubleClickExpandsDatabase(t *testing.T) 
 
 	_ = model.View()
 	hit := findRequiredHitbox(t, model.hitboxes, "database:0")
-	updated, _ := model.Update(tea.MouseMsg{X: hit.X, Y: hit.Y, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
-	got := updated.(*Model)
+	got := leftClick(model, hit.X, hit.Y).(*Model)
 	if got.selectedDB != "" || len(got.objects) != 0 {
 		t.Fatalf("single click selectedDB/objects = %q/%+v, want highlight only", got.selectedDB, got.objects)
 	}
 
-	updated, _ = got.Update(tea.MouseMsg{X: hit.X, Y: hit.Y, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
-	got = updated.(*Model)
+	got = leftClick(got, hit.X, hit.Y).(*Model)
 	if got.selectedDB != "app" || len(got.objects) != 1 {
 		t.Fatalf("double click selectedDB/objects = %q/%+v, want expanded app/users", got.selectedDB, got.objects)
 	}
@@ -135,12 +134,10 @@ func TestNavigationRepeatedClickOnHighlightedRowOpensWithoutDoubleClickTiming(t 
 
 	_ = model.View()
 	hit := findRequiredHitbox(t, model.hitboxes, "database:0")
-	updated, _ := model.Update(tea.MouseMsg{X: hit.X, Y: hit.Y, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
-	model = updated.(*Model)
+	model = leftClick(model, hit.X, hit.Y).(*Model)
 	model.lastClickAt = time.Now().Add(-time.Second)
 
-	updated, _ = model.Update(tea.MouseMsg{X: hit.X, Y: hit.Y, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
-	got := updated.(*Model)
+	got := leftClick(model, hit.X, hit.Y).(*Model)
 
 	if got.selectedDB != "app" || len(got.objects) != 1 {
 		t.Fatalf("second click selectedDB/objects = %q/%+v, want expanded app/users", got.selectedDB, got.objects)
@@ -281,7 +278,7 @@ func TestConnectionsListUnifiedDriverIconsAndLock(t *testing.T) {
 		{ID: "test-doris", Driver: config.DriverDoris, Host: "10.40.2.14", Port: 9030, ReadOnly: true},
 	}
 
-	raw := model.connectionsList()
+	raw := model.connectionsList(0)
 	got := stripANSI(raw)
 
 	if strings.Contains(got, "[mongo]") || strings.Contains(got, "[doris]") {

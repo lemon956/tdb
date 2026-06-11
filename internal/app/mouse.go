@@ -33,19 +33,69 @@ func (m *Model) handleMouse(ctx context.Context, msg tea.MouseMsg) {
 		}
 		return
 	}
-	if event.Button == tea.MouseButtonLeft && event.Action == tea.MouseActionPress && m.nearSidebarDivider(event.X, event.Y) {
-		m.resizingSidebar = true
-		m.setSidebarWidth(event.X + 1)
+	if event.Button != tea.MouseButtonLeft {
 		return
 	}
-	if event.Button != tea.MouseButtonLeft || event.Action != tea.MouseActionPress {
+	switch event.Action {
+	case tea.MouseActionPress:
+		if m.nearSidebarDivider(event.X, event.Y) {
+			m.resizingSidebar = true
+			m.setSidebarWidth(event.X + 1)
+			return
+		}
+		m.beginMouseDown(event.X, event.Y)
+	case tea.MouseActionMotion:
+		m.updateMouseDrag(event.X, event.Y)
+	case tea.MouseActionRelease:
+		m.endMouseDown(ctx, event.X, event.Y)
+	}
+}
+
+// beginMouseDown records a left press: it starts a potential drag-selection
+// (anchored here, bounded to the panel under the press) and defers any click
+// action to release, so a press-then-move is a selection, not a click.
+func (m *Model) beginMouseDown(x, y int) {
+	m.selActive = false
+	m.selecting = false
+	m.mouseMoved = false
+	m.mouseDownX, m.mouseDownY = x, y
+	m.selAnchorX, m.selAnchorY = x, y
+	m.selX, m.selY = x, y
+	sw := m.sidebarWidth()
+	if x < sw {
+		m.selMinX, m.selMaxX = 0, sw
+	} else {
+		m.selMinX, m.selMaxX = sw, max(sw+1, m.width)
+	}
+}
+
+// updateMouseDrag extends the selection on left-button motion (a held drag).
+func (m *Model) updateMouseDrag(x, y int) {
+	m.selX, m.selY = x, y
+	if x != m.mouseDownX || y != m.mouseDownY {
+		m.mouseMoved = true
+		m.selecting = true
+	}
+}
+
+func (m *Model) endMouseDown(ctx context.Context, x, y int) {
+	if m.mouseMoved {
+		m.selX, m.selY = x, y
+		if text := m.extractSelectionText(); text != "" {
+			m.copyText(text)
+		}
+		m.selecting = false
+		m.selActive = true // keep the selection highlighted until the next press
+		m.mouseMoved = false
 		return
 	}
-	hit, ok := m.hitboxes.Hit(event.X, event.Y)
+	// No motion → treat as a click (resolve the hitbox now, on release).
+	hit, ok := m.hitboxes.Hit(x, y)
 	if !ok {
 		return
 	}
-	if hit.Focus != "" {
+	// Don't refocus a background panel hidden behind an open overlay.
+	if hit.Focus != "" && !m.overlayOpen() {
 		m.focus = hit.Focus
 	}
 	now := time.Now()
@@ -53,7 +103,7 @@ func (m *Model) handleMouse(ctx context.Context, msg tea.MouseMsg) {
 	doubleClick := repeatedClick && now.Sub(m.lastClickAt) <= 450*time.Millisecond
 	m.lastClickID = hit.ID
 	m.lastClickAt = now
-	m.applyHitbox(ctx, hit, event.X, event.Y)
+	m.applyHitbox(ctx, hit, x, y)
 	if repeatedClick || doubleClick {
 		m.runPageAction(ctx, actionOpen)
 	}
@@ -111,6 +161,15 @@ func (m *Model) applyHitbox(ctx context.Context, hit Hitbox, x, y int) {
 		m.openDatabasePickerModal()
 		return
 	}
+	if strings.HasPrefix(hit.ID, "db-pick:") {
+		// Clicking a database-picker row selects + applies that database directly.
+		name := strings.TrimPrefix(hit.ID, "db-pick:")
+		m.modal = nil
+		m.input.Clear()
+		m.restoreModalFocus()
+		m.applyDatabaseSelection(name)
+		return
+	}
 	if strings.HasPrefix(hit.ID, "workspace-tab:") {
 		if idx, err := strconv.Atoi(strings.TrimPrefix(hit.ID, "workspace-tab:")); err == nil && idx >= 0 && idx < len(m.workspaceTabs) {
 			m.activeTabIndex = idx
@@ -127,6 +186,15 @@ func (m *Model) applyHitbox(ctx context.Context, hit Hitbox, x, y int) {
 		}
 		return
 	}
+	// While an overlay (modal/form/error/help) is open, only its own hitboxes act
+	// (handled above + via hit.Action). Background-panel clicks are ignored so the
+	// focus never jumps to a panel hidden behind the overlay.
+	if m.overlayOpen() {
+		if hit.Action != actionNone {
+			m.runPageAction(ctx, hit.Action)
+		}
+		return
+	}
 	switch hit.ID {
 	case "panel-sidebar":
 		m.focus = FocusSidebar
@@ -140,9 +208,11 @@ func (m *Model) applyHitbox(ctx context.Context, hit Hitbox, x, y int) {
 	case PageConnections:
 		if hit.Index >= 0 && hit.Index < len(m.vault.Profiles) {
 			m.connectionIndex = hit.Index
+			m.focus = FocusSidebar
+			m.message = "selected " + m.vault.Profiles[hit.Index].ID
 		}
 	case PageBrowser, PageData, PageQuery:
-		if strings.HasPrefix(hit.ID, "database:") {
+		if strings.HasPrefix(hit.ID, "catalog:") || strings.HasPrefix(hit.ID, "database:") {
 			m.setBrowserCursorByNodeID(hit.ID)
 			return
 		}
@@ -166,11 +236,18 @@ func (m *Model) applyDataViewportMouse(x, y int) bool {
 	}
 	contentX := m.sidebarWidth() + 2
 	contentY := 2
+	// headerLines must mirror workspaceDataContent exactly: title + cursor + target
+	// (3), +1 for the visual selection line, +1 for the non-metadata status line.
 	headerLines := 3
 	if tab.VimMode == vimModeVisual {
-		headerLines = 4
+		headerLines++
 	}
-	viewportRow := y - contentY - 2 - headerLines
+	if tab.Mode != workspaceMetadata {
+		headerLines++
+	}
+	// Panel content row 0 (Y=contentY) is the tab bar; the data grid's header rows
+	// follow on the next rows, so the first data row sits at contentY+1+headerLines.
+	viewportRow := y - contentY - 1 - headerLines
 	if viewportRow < 0 {
 		return false
 	}
@@ -226,6 +303,7 @@ func (m *Model) applyConnectionFormHitbox(ctx context.Context, hit Hitbox) bool 
 
 func isOpenableHitbox(hit Hitbox) bool {
 	return strings.HasPrefix(hit.ID, "connection:") ||
+		strings.HasPrefix(hit.ID, "catalog:") ||
 		strings.HasPrefix(hit.ID, "database:") ||
 		strings.HasPrefix(hit.ID, "object:") ||
 		strings.HasPrefix(hit.ID, "metadata:") ||

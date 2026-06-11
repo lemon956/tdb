@@ -51,6 +51,9 @@ type workspaceTab struct {
 	ResultView              ResultView
 	QueryText               string
 	QueryDatabase           string
+	QueryCatalog            string // Doris catalog the query runs against (empty = internal)
+	QueryDatabasePinned     bool   // true once the user picks a database explicitly (stops auto-follow)
+	QueryWarning            string // non-blocking syntax/character lint message
 	QueryBuffer             string
 	QueryCursor             int
 	QueryHistoryIndex       int
@@ -150,15 +153,15 @@ func (m *Model) openQueryWorkspaceTab() {
 	if m.nextQueryTabID > 1 {
 		title = fmt.Sprintf("Query %d", m.nextQueryTabID)
 	}
+	// Bind to the current sidebar selection (may be empty); the tab then
+	// auto-follows the sidebar until the user pins a database via the picker.
 	database := m.selectedDB
-	if database == "" && m.activeProfile != nil {
-		database = m.activeProfile.Database
-	}
 	tab := workspaceTab{
 		ID:                fmt.Sprintf("query:%d", m.nextQueryTabID),
 		Kind:              workspaceTabQuery,
 		Title:             title,
 		QueryDatabase:     database,
+		QueryCatalog:      m.selectedCatalog,
 		QueryHistoryIndex: -1,
 		VimMode:           vimModeInsert,
 		WorkspaceFocus:    workspaceFocusEditor,
@@ -168,7 +171,23 @@ func (m *Model) openQueryWorkspaceTab() {
 	m.activeTabIndex = len(m.workspaceTabs) - 1
 	m.focus = FocusMain
 	m.message = "query tab opened"
+	// Load the database's table/collection list (once) so completion can suggest
+	// table names after FROM/JOIN instead of falling back to functions/keywords.
+	m.ensureQueryObjectsLoaded(m.selectedCatalog, database)
 	m.syncActiveTabState()
+}
+
+// ensureQueryObjectsLoaded fetches the object list for database if it has not been
+// loaded yet, so the completion engine has table/collection names to offer.
+func (m *Model) ensureQueryObjectsLoaded(catalog, database string) {
+	if database == "" || m.adapter == nil {
+		return
+	}
+	m.ensureNavigationState()
+	if _, ok := m.databaseObjects[m.scopeKey(catalog, database)]; ok {
+		return
+	}
+	_ = m.loadObjectsForDatabase(context.Background(), catalog, database)
 }
 
 func (m *Model) moveWorkspaceTab(delta int) {
@@ -217,10 +236,12 @@ func (m *Model) handleWorkspaceTabShortcut(msg tea.KeyMsg) bool {
 		return false
 	}
 	switch msg.String() {
-	case "ctrl+right", "ctrl+l":
+	case "ctrl+right":
+		// Ctrl+H/Ctrl+L now switch panels (sidebar ↔ workspace); workspace-tab
+		// navigation stays on Ctrl+Left/Ctrl+Right.
 		m.moveWorkspaceTab(1)
 		return true
-	case "ctrl+left", "ctrl+h":
+	case "ctrl+left":
 		m.moveWorkspaceTab(-1)
 		return true
 	case "ctrl+w":
@@ -301,18 +322,24 @@ func (m *Model) workspaceContentWidth() int {
 // workspaceDatabaseName returns the database the active workspace tab is bound
 // to (used for the inline tab-bar indicator and the database picker).
 func (m *Model) workspaceDatabaseName() string {
-	database := ""
+	database, catalog := "", ""
 	if tab := m.activeWorkspaceTab(); tab != nil {
 		database = tab.QueryDatabase
+		catalog = tab.QueryCatalog
 	}
 	if database == "" {
 		database = m.selectedDB
+		catalog = m.selectedCatalog
 	}
 	if database == "" && m.activeProfile != nil {
 		database = m.activeProfile.Database
+		catalog = ""
 	}
 	if database == "" {
-		database = "-"
+		return "-"
+	}
+	if cat := normalizedCatalog(catalog); cat != "" {
+		return cat + "." + database
 	}
 	return database
 }
@@ -487,11 +514,16 @@ func (m *Model) workspaceQueryContent(tab workspaceTab) string {
 	// column anchoring of the inline suggestion popup.
 	b.WriteString(theme.queryInput.Width(width).Render(strings.TrimRight(inner, "\n")) + "\n")
 
+	if tab.QueryWarning != "" {
+		b.WriteString(theme.statusWarn.Render("⚠ "+tab.QueryWarning) + "\n")
+	}
 	if tab.QueryText != "" {
 		b.WriteString(theme.muted.Render("Statement: "+tab.QueryText) + "\n")
 	}
 	if tab.Error != "" {
-		b.WriteString(theme.danger.Render("Error: "+tab.Error) + "\n")
+		// Bound the width so the long backend error wraps inside the border
+		// instead of overflowing and fragmenting it.
+		b.WriteString(theme.danger.Width(clamp(width-4, 20, width)).Render("Error: "+tab.Error) + "\n")
 		return b.String()
 	}
 	if !hasResultSet(tab.Result) {
@@ -692,25 +724,81 @@ func (m *Model) renderQueryBuffer(tab workspaceTab) string {
 // width. It carries no anchor padding; placement is handled by the overlay.
 func (m *Model) querySuggestionBoxBody(tab workspaceTab, maxWidth int) (string, int) {
 	items := tab.QuerySuggestions
-	limit := min(len(items), 5)
+	const visible = 8
+	total := len(items)
+	// Window the list around the selected index so the highlight stays on screen
+	// past the first page instead of "falling out" of the popup.
+	offset := 0
+	if total > visible {
+		offset = clamp(tab.QuerySuggestionIdx-visible/2, 0, total-visible)
+	}
+	end := min(total, offset+visible)
+
 	popupWidth := 0
-	for idx := 0; idx < limit; idx++ {
+	for idx := offset; idx < end; idx++ {
 		popupWidth = max(popupWidth, lipgloss.Width(querySuggestionPopupLabel(items[idx])))
 	}
 	popupWidth = clamp(popupWidth+2, 8, max(8, maxWidth))
+
 	theme := defaultTheme()
 	var b strings.Builder
-	for idx := 0; idx < limit; idx++ {
-		line := " " + fitDataTableCell(querySuggestionPopupLabel(items[idx]), popupWidth-2) + " "
-		if idx == tab.QuerySuggestionIdx {
-			line = theme.selected.Render(line)
-		}
-		if idx > 0 {
+	writeLine := func(s string) {
+		if b.Len() > 0 {
 			b.WriteString("\n")
 		}
-		b.WriteString(line)
+		b.WriteString(s)
+	}
+	if offset > 0 {
+		writeLine(theme.muted.Render(fitDataTableCell(fmt.Sprintf(" ▲ %d", offset), popupWidth)))
+	}
+	for idx := offset; idx < end; idx++ {
+		cell := renderSuggestionRow(theme, items[idx], popupWidth-2, idx == tab.QuerySuggestionIdx)
+		writeLine(" " + cell + " ")
+	}
+	if end < total {
+		writeLine(theme.muted.Render(fitDataTableCell(fmt.Sprintf(" ▼ %d", total-end), popupWidth)))
 	}
 	return b.String(), popupWidth
+}
+
+// renderSuggestionRow renders one completion cell of exactly width display cells:
+// the value (default colour) followed by its type detail in a lighter (muted)
+// colour. The selected row is highlighted uniformly. width is the inner cell width.
+func renderSuggestionRow(theme appTheme, item suggest.Suggestion, width int, selected bool) string {
+	if width <= 0 {
+		return ""
+	}
+	value := item.Label
+	if value == "" {
+		value = item.Value
+	}
+	detail := item.Detail
+	gap := ""
+	if detail != "" {
+		gap = "  "
+	}
+	suffixW := lipgloss.Width(gap) + lipgloss.Width(detail)
+	maxVal := width - suffixW
+	if maxVal < 1 {
+		// Detail alone fills the cell; show a clipped value only.
+		plain := fitDataTableCell(value, width)
+		if selected {
+			return theme.selected.Render(plain)
+		}
+		return plain
+	}
+	if lipgloss.Width(value) > maxVal {
+		if maxVal <= 1 {
+			value = cellSlice(value, 0, maxVal)
+		} else {
+			value = cellSlice(value, 0, maxVal-1) + "…"
+		}
+	}
+	pad := max(0, width-lipgloss.Width(value)-suffixW)
+	if selected {
+		return theme.selected.Render(value + gap + detail + strings.Repeat(" ", pad))
+	}
+	return value + gap + theme.muted.Render(detail) + strings.Repeat(" ", pad)
 }
 
 func querySuggestionPopupLabel(item suggest.Suggestion) string {
@@ -845,10 +933,15 @@ func (m *Model) executeQueryInActiveTab(ctx context.Context, line string) {
 	if database == "" {
 		database = m.selectedDB
 	}
+	catalog := tab.QueryCatalog
+	if catalog == "" {
+		catalog = m.selectedCatalog
+	}
 	// Clear the input immediately so the spinner animates over an empty editor
 	// while the query runs in the background.
 	tab.QueryText = line
 	tab.QueryDatabase = database
+	tab.QueryCatalog = catalog
 	tab.QueryBuffer = ""
 	tab.QueryCursor = 0
 	tab.QuerySuggestionsVisible = false
@@ -862,7 +955,7 @@ func (m *Model) executeQueryInActiveTab(ctx context.Context, line string) {
 	start := time.Now()
 	m.syncActiveTabState()
 	m.nextCmd = m.runAsync("Running query…", func(ctx context.Context) tea.Msg {
-		res, err := adapter.Execute(ctx, db.Command{Text: line, Database: database})
+		res, err := adapter.Execute(ctx, db.Command{Text: line, Catalog: catalog, Database: database})
 		dur := time.Since(start)
 		return asyncResultMsg{apply: func(m *Model) {
 			m.applyQueryResult(tabID, line, database, profileID, driver, res, err, dur, start)
@@ -955,14 +1048,19 @@ func (m *Model) executeQueryLine(ctx context.Context, tab *workspaceTab, line, d
 	if database == "" {
 		database = m.selectedDB
 	}
+	catalog := tab.QueryCatalog
+	if catalog == "" {
+		catalog = m.selectedCatalog
+	}
 	start := time.Now()
 	opCtx, cancel := m.dbContext(ctx)
-	res, err := m.adapter.Execute(opCtx, db.Command{Text: line, Database: database})
+	res, err := m.adapter.Execute(opCtx, db.Command{Text: line, Catalog: catalog, Database: database})
 	cancel()
 	status := history.StatusOK
 	errText := ""
 	tab.QueryText = line
 	tab.QueryDatabase = database
+	tab.QueryCatalog = catalog
 	if err != nil {
 		status = history.StatusError
 		errText = err.Error()

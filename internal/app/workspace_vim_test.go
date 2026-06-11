@@ -912,13 +912,7 @@ func TestMouseClickDataViewportMovesDisplayCharacterCursor(t *testing.T) {
 	sidebarWidth := clamp(model.width/5, 22, 32)
 	contentX := sidebarWidth + 2
 	firstDataY := 7
-	updated, _ := model.Update(tea.MouseMsg{
-		X:      contentX + 3,
-		Y:      firstDataY + 1,
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionPress,
-	})
-	model = updated.(*Model)
+	model = leftClick(model, contentX+3, firstDataY+1).(*Model)
 
 	tab := model.activeWorkspaceTab()
 	if model.focus != FocusMain || tab.ResultRow != 1 || tab.ResultColumn != 3 {

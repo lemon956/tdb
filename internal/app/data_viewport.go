@@ -3,12 +3,23 @@ package app
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 
 	"tdb/internal/result"
 )
+
+// mongoObjectIDPattern matches an _id (or *_id reference) whose value is a 24-char
+// hex string, so mongo documents render the value as ObjectId("...") shell-style.
+var mongoObjectIDPattern = regexp.MustCompile(`("(?:_id|[A-Za-z0-9_]*_id)"\s*:\s*)"([0-9a-fA-F]{24})"`)
+
+// wrapMongoObjectIDs rewrites `"_id": "<hex>"` to `"_id": ObjectId("<hex>")` in a
+// rendered JSON document. Non-24-hex ids (custom string keys) are left untouched.
+func wrapMongoObjectIDs(jsonText string) string {
+	return mongoObjectIDPattern.ReplaceAllString(jsonText, `${1}ObjectId("${2}")`)
+}
 
 const maxDataLineCells = 4096
 const maxDataTableCellCells = 40
@@ -235,7 +246,7 @@ func dataResultLines(set result.Set) []string {
 				lines = append(lines, fmt.Sprint(doc.Data))
 				continue
 			}
-			lines = append(lines, splitContentLines(string(raw))...)
+			lines = append(lines, splitContentLines(wrapMongoObjectIDs(string(raw)))...)
 		}
 		return lines
 	}

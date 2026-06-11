@@ -22,6 +22,8 @@ const (
 	modalQueryHistorySearch modalKind = "query_history_search"
 	modalDatabasePicker     modalKind = "database_picker"
 	modalConfirm            modalKind = "confirm"
+	modalAIChat             modalKind = "ai_chat"
+	modalAISQLPick          modalKind = "ai_sql_pick"
 )
 
 type modalState struct {
@@ -64,6 +66,10 @@ func (m *Model) handleOverlayKey(msg tea.KeyMsg) bool {
 		return m.handleQueryHistorySearchModalKey(msg)
 	case modalDatabasePicker:
 		return m.handleDatabasePickerModalKey(msg)
+	case modalAIChat:
+		return m.handleAIChatModalKey(msg)
+	case modalAISQLPick:
+		return m.handleAISQLPickKey(msg)
 	default:
 		return m.handleGenericModalKey(msg)
 	}
@@ -103,7 +109,7 @@ func selectedRow(theme appTheme, text string, selected bool) string {
 func (m *Model) databasePickerContent() string {
 	var b strings.Builder
 	theme := defaultTheme()
-	b.WriteString("Search: " + m.input.Value() + m.renderCursorCell(" ") + "\n")
+	b.WriteString("Search: " + m.input.Value() + m.activeInputCursor() + "\n")
 	names := m.filteredDatabases()
 	if len(names) == 0 {
 		if len(m.databases) == 0 {
@@ -126,7 +132,9 @@ func (m *Model) databasePickerContent() string {
 		if name == current {
 			active = "● "
 		}
-		b.WriteString(selectedRow(theme, fmt.Sprintf("%s %s%s", marker, active, name), selected) + "\n")
+		// rowMarker (zero-width) lets extractRowHits register a click hitbox on this
+		// row's rendered line; the name follows it for click dispatch.
+		b.WriteString(rowMarker + selectedRow(theme, fmt.Sprintf("%s %s%s", marker, active, name), selected) + "\n")
 	}
 	b.WriteString("\n[ Close ]")
 	return b.String()
@@ -162,9 +170,9 @@ func (m *Model) handleDatabasePickerModalKey(msg tea.KeyMsg) bool {
 		m.closeModal()
 	case "enter":
 		m.acceptDatabasePickerSelection()
-	case "up", "k":
+	case "up", "k", "shift+tab":
 		m.moveDatabasePickerSelection(-1)
-	case "down", "j":
+	case "down", "j", "tab":
 		m.moveDatabasePickerSelection(1)
 	case "pgup":
 		m.moveDatabasePickerSelection(-m.modalBodyHeight())
@@ -194,7 +202,11 @@ func (m *Model) applyDatabaseSelection(database string) {
 		m.message = "open a query tab to switch its database"
 		return
 	}
+	// The picker lists the internal catalog's databases; pin the tab so this
+	// explicit choice is not overwritten by sidebar auto-follow.
 	tab.QueryDatabase = database
+	tab.QueryCatalog = ""
+	tab.QueryDatabasePinned = true
 	m.syncActiveTabState()
 	m.message = "database: " + database
 	if m.adapter == nil {
@@ -398,6 +410,10 @@ func (m *Model) modalContent() string {
 		return m.modalBox("Query history", m.queryHistorySearchContent(), colAccent)
 	case modalDatabasePicker:
 		return m.modalBox("Switch database", m.databasePickerContent(), colAccent)
+	case modalAIChat:
+		return m.modalBox("AI assistant", m.aiChatContent(), colAccent)
+	case modalAISQLPick:
+		return m.modalBox("Insert which SQL?", m.aiSQLPickContent(), colAccent)
 	case modalConfirm:
 		return m.modalBox("Confirm", m.confirmContent(), colDangerLine)
 	default:
@@ -473,6 +489,10 @@ func (m *Model) currentModalBody() string {
 		return m.queryHistorySearchContent()
 	case modalDatabasePicker:
 		return m.databasePickerContent()
+	case modalAIChat:
+		return m.aiChatContent()
+	case modalAISQLPick:
+		return m.aiSQLPickContent()
 	case modalConfirm:
 		return m.confirmContent()
 	default:
@@ -576,7 +596,7 @@ func (m *Model) handleQueryHistorySearchModalKey(msg tea.KeyMsg) bool {
 
 func (m *Model) queryHistorySearchContent() string {
 	var b strings.Builder
-	b.WriteString("Search: " + m.input.Value() + m.renderCursorCell(" ") + "\n")
+	b.WriteString("Search: " + m.input.Value() + m.activeInputCursor() + "\n")
 	entries := m.filteredQueryHistoryEntries()
 	if len(entries) == 0 {
 		b.WriteString("No query history.\n")

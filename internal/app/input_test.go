@@ -3,9 +3,35 @@ package app
 import (
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"tdb/internal/suggest"
 )
+
+func TestBackspaceDeletesWholeRune(t *testing.T) {
+	in := NewCommandInput()
+	in.Insert("我需要")
+	in.Backspace()
+	if in.Value() != "我需" {
+		t.Fatalf("backspace should drop one CJK rune, got %q", in.Value())
+	}
+	if !utf8.ValidString(in.Value()) {
+		t.Fatalf("value must stay valid UTF-8, got %q", in.Value())
+	}
+	// Mixed ASCII/CJK: each backspace removes exactly one rune, never a partial byte.
+	in = NewCommandInput()
+	in.Insert("ab我c")
+	for _, want := range []string{"ab我", "ab", "a", ""} {
+		in.Backspace()
+		if in.Value() != want {
+			t.Fatalf("backspace = %q, want %q", in.Value(), want)
+		}
+		if !utf8.ValidString(in.Value()) {
+			t.Fatalf("value must stay valid UTF-8, got %q", in.Value())
+		}
+	}
+	in.Backspace() // empty: must not panic
+}
 
 func TestSanitizeMultilineInputNormalizesCR(t *testing.T) {
 	got := sanitizeMultilineInput("SELECT *\r\nFROM t\rLIMIT 1;\x00")

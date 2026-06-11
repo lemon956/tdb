@@ -475,16 +475,47 @@ func parseMongoshArrayArg(args []string, index int) []any {
 	return nil
 }
 
-var mongoshKeyPattern = regexp.MustCompile(`([\{,]\s*)([A-Za-z_$][A-Za-z0-9_$]*)(\s*:)`)
+var (
+	mongoshKeyPattern       = regexp.MustCompile(`([\{,]\s*)([A-Za-z_$][A-Za-z0-9_$]*)(\s*:)`)
+	mongoshObjectIDPattern  = regexp.MustCompile(`[Oo]bject[Ii][dD]\(\s*"([^"]*)"\s*\)`)
+	mongoshISODatePattern   = regexp.MustCompile(`ISODate\(\s*"([^"]*)"\s*\)`)
+	mongoshNumberLongP      = regexp.MustCompile(`NumberLong\(\s*"?([0-9-]+)"?\s*\)`)
+	mongoshNumberDecimalP   = regexp.MustCompile(`NumberDecimal\(\s*"([^"]*)"\s*\)`)
+	mongoshNumberIntPattern = regexp.MustCompile(`NumberInt\(\s*"?([0-9-]+)"?\s*\)`)
+)
+
+// normalizeMongoshExtended turns mongosh shell syntax into MongoDB relaxed
+// Extended JSON: unquoted keys are quoted, single quotes become double quotes, and
+// shell constructors (ObjectId/ISODate/NumberLong/...) become their $-typed forms
+// so bson.UnmarshalExtJSON can decode them into real BSON values.
+func normalizeMongoshExtended(text string) string {
+	s := mongoshKeyPattern.ReplaceAllString(strings.TrimSpace(text), `${1}"${2}"${3}`)
+	s = strings.ReplaceAll(s, "'", `"`)
+	// Note: "$$" emits a literal "$" in regexp replacements ("$oid" would be read as
+	// a capture-group reference).
+	s = mongoshObjectIDPattern.ReplaceAllString(s, `{"$$oid":"$1"}`)
+	s = mongoshISODatePattern.ReplaceAllString(s, `{"$$date":"$1"}`)
+	s = mongoshNumberLongP.ReplaceAllString(s, `{"$$numberLong":"$1"}`)
+	s = mongoshNumberDecimalP.ReplaceAllString(s, `{"$$numberDecimal":"$1"}`)
+	s = mongoshNumberIntPattern.ReplaceAllString(s, `$1`)
+	return s
+}
 
 func parseMongoshValue(text string) (any, error) {
-	normalized := mongoshKeyPattern.ReplaceAllString(strings.TrimSpace(text), `${1}"${2}"${3}`)
-	normalized = strings.ReplaceAll(normalized, "'", `"`)
-	var value any
-	if err := json.Unmarshal([]byte(normalized), &value); err != nil {
+	normalized := normalizeMongoshExtended(text)
+	trimmed := strings.TrimSpace(normalized)
+	if strings.HasPrefix(trimmed, "[") {
+		var arr bson.A
+		if err := bson.UnmarshalExtJSON([]byte(trimmed), false, &arr); err != nil {
+			return nil, err
+		}
+		return []any(arr), nil
+	}
+	var m bson.M
+	if err := bson.UnmarshalExtJSON([]byte(trimmed), false, &m); err != nil {
 		return nil, err
 	}
-	return value, nil
+	return map[string]any(m), nil
 }
 
 func (a *Adapter) Close() error {

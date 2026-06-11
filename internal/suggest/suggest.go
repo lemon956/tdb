@@ -7,6 +7,17 @@ import (
 	"tdb/internal/config"
 )
 
+// Want expresses what the cursor position calls for, so SQL completion can lead
+// with fields after SELECT/WHERE and with table names after FROM/JOIN.
+type Want int
+
+const (
+	WantAny    Want = iota // no clause hint: fields, objects, keywords, functions
+	WantFields             // after SELECT/WHERE/...: columns + functions first
+	WantTables             // after FROM/JOIN/...: table/collection names first
+	WantNone               // suppress entirely (e.g. just after ';')
+)
+
 type Context struct {
 	Page    string
 	Driver  config.Driver
@@ -14,6 +25,10 @@ type Context struct {
 	Cursor  int
 	Objects []string
 	Fields  []Field
+	// Want hints the desired completion category for SQL clauses (default WantAny).
+	Want Want
+	// Table, when set, qualifies field suggestions as "table.field".
+	Table string
 }
 
 // Field is a column/field of the current table or collection. Type is the
@@ -28,6 +43,16 @@ type Suggestion struct {
 	Value  string `json:"value"`
 	Label  string `json:"label,omitempty"`
 	Detail string `json:"detail,omitempty"`
+	// Match, when set, is the string typed-text is matched/ranked against instead
+	// of Value. It lets a qualified field "table.col" be filtered by "col".
+	Match string `json:"-"`
+}
+
+func (s Suggestion) matchKey() string {
+	if s.Match != "" {
+		return s.Match
+	}
+	return s.Value
 }
 
 var pageCommands = map[string][]Suggestion{
@@ -128,7 +153,7 @@ func Suggest(ctx Context) []Suggestion {
 	token := currentToken(input)
 	filtered := make([]Suggestion, 0, len(candidates))
 	for _, candidate := range candidates {
-		if matches(candidate.Value, token) {
+		if matches(candidate.matchKey(), token) {
 			if candidate.Label == "" {
 				candidate.Label = candidate.Value
 			}
@@ -139,8 +164,8 @@ func Suggest(ctx Context) []Suggestion {
 	// them first while keeping each group's original order.
 	if lower := strings.ToLower(token); lower != "" {
 		sort.SliceStable(filtered, func(i, j int) bool {
-			pi := strings.HasPrefix(strings.ToLower(filtered[i].Value), lower)
-			pj := strings.HasPrefix(strings.ToLower(filtered[j].Value), lower)
+			pi := strings.HasPrefix(strings.ToLower(filtered[i].matchKey()), lower)
+			pj := strings.HasPrefix(strings.ToLower(filtered[j].matchKey()), lower)
 			return pi && !pj
 		})
 	}
@@ -151,11 +176,20 @@ func candidatesFor(ctx Context, input string) []Suggestion {
 	// withSQLContext combines the current table's fields/objects with the driver's
 	// keyword and function lists (vendored from the upstream syntax libraries).
 	withSQLContext := func(keywords, functions []Suggestion) []Suggestion {
-		candidates := append([]Suggestion{}, fieldSuggestions(ctx.Fields)...)
-		candidates = append(candidates, objectSuggestions(ctx.Objects)...)
-		candidates = append(candidates, keywords...)
-		candidates = append(candidates, functions...)
-		return candidates
+		fields := fieldSuggestions(ctx.Fields, ctx.Table)
+		objects := objectSuggestions(ctx.Objects, "table")
+		switch ctx.Want {
+		case WantNone:
+			return nil
+		case WantTables:
+			// After FROM/JOIN: table names lead; keywords follow for clause words.
+			return concatSuggestions(objects, keywords, functions)
+		case WantFields:
+			// After SELECT/WHERE: columns and functions lead; tables/keywords trail.
+			return concatSuggestions(fields, functions, keywords, objects)
+		default:
+			return concatSuggestions(fields, objects, keywords, functions)
+		}
 	}
 	switch ctx.Driver {
 	case config.DriverMySQL:
@@ -163,7 +197,7 @@ func candidatesFor(ctx Context, input string) []Suggestion {
 	case config.DriverDoris:
 		return withSQLContext(dorisKeywords, dorisFunctions)
 	case config.DriverRedis:
-		return append(objectSuggestions(ctx.Objects), redisCommands...)
+		return append(objectSuggestions(ctx.Objects, "key"), redisCommands...)
 	case config.DriverMongo:
 		return mongoCandidates(ctx, input)
 	default:
@@ -183,7 +217,7 @@ func inputAtCursor(ctx Context) string {
 
 func mongoCandidates(ctx Context, input string) []Suggestion {
 	if _, ok := mongoCollectionCompletion(input); ok {
-		return objectSuggestions(ctx.Objects)
+		return objectSuggestions(ctx.Objects, "collection")
 	}
 	if _, ok := mongoMethodCompletion(input); ok {
 		return mongoMethods
@@ -201,10 +235,10 @@ func mongoCandidates(ctx Context, input string) []Suggestion {
 			}
 			return mongoQueryOperators
 		}
-		candidates := append(fieldSuggestions(ctx.Fields), mongoFragments...)
+		candidates := append(fieldSuggestions(ctx.Fields, ""), mongoFragments...)
 		return append(candidates, append(mongoQueryOperators, mongoUpdateOperators...)...)
 	}
-	return append(objectSuggestions(ctx.Objects), mongoFragments...)
+	return append(objectSuggestions(ctx.Objects, "collection"), mongoFragments...)
 }
 
 func mongoCollectionCompletion(input string) (string, bool) {
@@ -261,22 +295,46 @@ func mongoInsideUpdateDocument(input string) bool {
 	return strings.Contains(input[:open], "updateOne(") || strings.Contains(input[:open], "updateMany(")
 }
 
-func objectSuggestions(objects []string) []Suggestion {
+// objectSuggestions builds candidates for database objects. kind is the per-driver
+// type label shown as the suggestion detail (e.g. "table", "collection", "key").
+func objectSuggestions(objects []string, kind string) []Suggestion {
 	out := make([]Suggestion, 0, len(objects))
 	for _, object := range objects {
-		out = append(out, Suggestion{Value: object, Detail: "collection"})
+		out = append(out, Suggestion{Value: object, Detail: kind})
 	}
 	return out
 }
 
-func fieldSuggestions(fields []Field) []Suggestion {
+// fieldSuggestions builds column/field candidates. When table is non-empty the
+// inserted Value is qualified ("table.field") while Match stays the bare field
+// name so typed text still filters by the column.
+func fieldSuggestions(fields []Field, table string) []Suggestion {
 	out := make([]Suggestion, 0, len(fields))
 	for _, field := range fields {
 		detail := field.Type
 		if detail == "" {
 			detail = "field"
 		}
-		out = append(out, Suggestion{Value: field.Name, Detail: detail})
+		value := field.Name
+		match := ""
+		if table != "" {
+			value = table + "." + field.Name
+			match = field.Name
+		}
+		out = append(out, Suggestion{Value: value, Detail: detail, Match: match})
+	}
+	return out
+}
+
+// concatSuggestions joins suggestion groups in order into a new slice.
+func concatSuggestions(groups ...[]Suggestion) []Suggestion {
+	total := 0
+	for _, g := range groups {
+		total += len(g)
+	}
+	out := make([]Suggestion, 0, total)
+	for _, g := range groups {
+		out = append(out, g...)
 	}
 	return out
 }
@@ -288,8 +346,10 @@ func matches(value, token string) bool {
 	return strings.Contains(strings.ToLower(value), strings.ToLower(token))
 }
 
+// currentToken is the run of identifier characters immediately before the cursor.
+// It is empty when the cursor sits right after whitespace or punctuation, so e.g.
+// "select * from " yields "" (offer all tables) rather than "from".
 func currentToken(input string) string {
-	input = strings.TrimRight(input, " \t\n")
 	start := len(input)
 	for start > 0 {
 		r := input[start-1]

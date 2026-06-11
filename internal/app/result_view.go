@@ -171,7 +171,7 @@ func (v ResultView) renderDocuments(docs []result.Document) string {
 			b.WriteString(theme.muted.Render(strings.Repeat("─", 24)) + "\n")
 		}
 		raw, _ := json.MarshalIndent(docs[idx].Data, "", "  ")
-		b.Write(raw)
+		b.WriteString(wrapMongoObjectIDs(string(raw)))
 		b.WriteString("\n")
 	}
 	if len(docs) > 0 {

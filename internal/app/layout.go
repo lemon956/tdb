@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -49,15 +50,25 @@ func (m *Model) renderLayout() string {
 		mainWidth = 34
 	}
 
-	sidebarContentHeight := max(1, bodyHeight-2)
-	sidebarContentWidth := max(8, sidebarWidth-4)
-	sidebar := renderPanel(theme, "", m.sidebarContent(sidebarContentHeight, sidebarContentWidth), FocusSidebar, m.focus == FocusSidebar, sidebarWidth, bodyHeight)
-	main := renderPanel(theme, "", m.mainContent(), FocusMain, m.focus == FocusMain, mainWidth, bodyHeight)
-	footerY := bodyHeight + 1 + commandHeight
-	m.registerLayoutHitboxes(sidebarWidth, mainWidth, bodyHeight, footerY)
-	panels := []string{sidebar, main}
+	var body string
+	if m.page == PageGame {
+		body = padBlock(m.game.render(width-2, bodyHeight-1), width, bodyHeight)
+		m.hitboxes = nil
+	} else if m.connectionsPopupActive() {
+		// The connection-selection page is a centered VisiData-style popup over a
+		// blank body (its own hitboxes are registered inside).
+		body = m.connectionsPopupBody(width, bodyHeight)
+	} else {
+		sidebarContentHeight := max(1, bodyHeight-2)
+		sidebarContentWidth := max(8, sidebarWidth-4)
+		sidebar := renderPanel(theme, "", m.sidebarContent(sidebarContentHeight, sidebarContentWidth), FocusSidebar, m.focus == FocusSidebar, sidebarWidth, bodyHeight)
+		main := renderPanel(theme, "", m.mainContent(), FocusMain, m.focus == FocusMain, mainWidth, bodyHeight)
+		footerY := bodyHeight + 1 + commandHeight
+		m.registerLayoutHitboxes(sidebarWidth, mainWidth, bodyHeight, footerY)
+		body = lipgloss.JoinHorizontal(lipgloss.Top, sidebar, main)
+	}
 
-	parts := []string{header, lipgloss.JoinHorizontal(lipgloss.Top, panels...)}
+	parts := []string{header, body}
 	if commandVisible {
 		if commandSuggestionVisible {
 			parts = append(parts, renderCommandSuggestions(theme, m, width))
@@ -93,116 +104,141 @@ func (m *Model) registerLayoutHitboxes(sidebarWidth, mainWidth, bodyHeight, foot
 		{ID: "panel-sidebar", X: 0, Y: 1, Width: sidebarWidth, Height: bodyHeight, Focus: FocusSidebar},
 		{ID: "panel-main", X: sidebarWidth, Y: 1, Width: mainWidth, Height: bodyHeight, Focus: FocusMain},
 	}
-	// Header row (Y=0): connection tabs after "TDB", then a trailing "+".
-	hx := lipgloss.Width(defaultTheme().header.Render("TDB"))
-	for i := range m.sessions {
-		w := lipgloss.Width(m.connTabText(i))
-		boxes = append(boxes, Hitbox{ID: fmt.Sprintf("conn-tab:%d", i), X: hx, Y: 0, Width: w, Height: 1, Index: i})
-		hx += w
+	// Header row (Y=0): connection tabs after "TDB", then a trailing "+". Positions
+	// come from the same layout the renderer uses, so they never drift, and only
+	// the visible (windowed) tabs get hitboxes.
+	headerWidth := m.width
+	if headerWidth <= 0 {
+		headerWidth = 100
 	}
-	boxes = append(boxes, Hitbox{ID: "conn-add", X: hx, Y: 0, Width: lipgloss.Width(connAddText), Height: 1})
+	_, headerHits := m.headerTabLayout(headerWidth)
+	for _, h := range headerHits {
+		if h.index < 0 {
+			boxes = append(boxes, Hitbox{ID: "conn-add", X: h.x, Y: 0, Width: h.width, Height: 1})
+			continue
+		}
+		boxes = append(boxes, Hitbox{ID: fmt.Sprintf("conn-tab:%d", h.index), X: h.x, Y: 0, Width: h.width, Height: 1, Index: h.index})
+	}
 	mainX := sidebarWidth
 	if m.errBox != nil {
-		boxes = append(boxes, Hitbox{ID: "error:close", X: mainX + 4, Y: 8, Width: 10, Height: 1, Focus: FocusContext, Action: actionCancel})
+		// The error box renders directly in the main panel (no modalBox wrapper), so
+		// its body starts at panel content Y=2.
+		if y := modalMarkerRow(m.errorBoxContent(), "[ Close ]", 2); y >= 0 {
+			boxes = append(boxes, Hitbox{ID: "error:close", X: mainX + 2, Y: y, Width: 12, Height: 1, Focus: FocusContext, Action: actionCancel})
+		}
 	}
 	if m.helpOpen {
-		boxes = append(boxes, Hitbox{ID: "help:close", X: mainX + 4, Y: 14, Width: 10, Height: 1, Focus: FocusContext, Action: actionCancel})
+		// Help renders via modalBox; its body starts at Y=4 (panel border + box
+		// border + the box title line).
+		if y := modalMarkerRow(m.helpPanelContent(), "[ Close ]", 4); y >= 0 {
+			boxes = append(boxes, Hitbox{ID: "help:close", X: mainX + 4, Y: y, Width: 12, Height: 1, Focus: FocusContext, Action: actionCancel})
+		}
 	}
 	if m.form != nil {
 		boxes = append(boxes, m.connectionFormHitboxes(mainX, mainWidth)...)
 	}
 	if m.pending != nil {
-		boxes = append(boxes,
-			Hitbox{ID: "confirm-ok", X: mainX + 4, Y: 8, Width: 10, Height: 1, Focus: FocusMain, Action: actionConfirm},
-			Hitbox{ID: "confirm-cancel", X: mainX + 16, Y: 8, Width: 10, Height: 1, Focus: FocusMain, Action: actionCancel},
-		)
+		if y := modalMarkerRow(m.confirmContent(), "[ Confirm ]", 4); y >= 0 {
+			boxes = append(boxes,
+				Hitbox{ID: "confirm-ok", X: mainX + 4, Y: y, Width: 11, Height: 1, Focus: FocusMain, Action: actionConfirm},
+				Hitbox{ID: "confirm-cancel", X: mainX + 17, Y: y, Width: 10, Height: 1, Focus: FocusMain, Action: actionCancel},
+			)
+		}
 	}
 	if m.modal != nil && m.form == nil && m.pending == nil && m.errBox == nil {
 		boxes = append(boxes, Hitbox{ID: "modal:close", X: mainX + 4, Y: 8, Width: 10, Height: 1, Focus: FocusContext, Action: actionCancel})
 	}
-	if tab := m.activeWorkspaceTab(); tab != nil {
-		// Tab-bar row (content row 0). Cells are clickable to switch tabs and the
-		// `▸ <db>` label is clickable to open the database picker.
-		contentX := mainX + 2
-		cellWidth, dbX := m.workspaceTabLayout(m.workspaceContentWidth())
-		for i := range m.workspaceTabs {
-			boxes = append(boxes, Hitbox{
-				ID:     fmt.Sprintf("workspace-tab:%d", i),
-				X:      contentX + i*(cellWidth+1),
-				Y:      2,
-				Width:  cellWidth,
-				Height: 1,
-				Focus:  FocusMain,
-				Index:  i,
-			})
-		}
-		dbLabel := "▸ " + m.workspaceDatabaseName()
-		boxes = append(boxes, Hitbox{
-			ID:     "workspace-db",
-			X:      contentX + dbX,
-			Y:      2,
-			Width:  max(1, lipgloss.Width(dbLabel)),
-			Height: 1,
-			Focus:  FocusMain,
-		})
-		if tab.Kind == workspaceTabQuery {
-			for idx, statement := range queryExecutableStatements(tab.QueryBuffer) {
+	// Page-content hitboxes (workspace tabs, query-run buttons, sidebar nodes) are
+	// suppressed while an overlay is open so clicks land on the overlay's own rows
+	// (registered via modalRowHits) instead of leaking to the page beneath.
+	if !m.overlayOpen() {
+		if tab := m.activeWorkspaceTab(); tab != nil {
+			// Tab-bar row (content row 0). Cells are clickable to switch tabs and the
+			// `▸ <db>` label is clickable to open the database picker.
+			contentX := mainX + 2
+			cellWidth, dbX := m.workspaceTabLayout(m.workspaceContentWidth())
+			for i := range m.workspaceTabs {
 				boxes = append(boxes, Hitbox{
-					ID:     fmt.Sprintf("query-run:%d", idx),
-					X:      mainX + 2,
-					Y:      3 + statement.Line,
-					Width:  4,
+					ID:     fmt.Sprintf("workspace-tab:%d", i),
+					X:      contentX + i*(cellWidth+1),
+					Y:      2,
+					Width:  cellWidth,
 					Height: 1,
 					Focus:  FocusMain,
+					Index:  i,
+				})
+			}
+			dbLabel := "▸ " + m.workspaceDatabaseName()
+			boxes = append(boxes, Hitbox{
+				ID:     "workspace-db",
+				X:      contentX + dbX,
+				Y:      2,
+				Width:  max(1, lipgloss.Width(dbLabel)),
+				Height: 1,
+				Focus:  FocusMain,
+			})
+			if tab.Kind == workspaceTabQuery {
+				for idx, statement := range queryExecutableStatements(tab.QueryBuffer) {
+					boxes = append(boxes, Hitbox{
+						ID: fmt.Sprintf("query-run:%d", idx),
+						X:  mainX + 2,
+						// Content row 0 (Y=2) is the tab bar, row 1 (Y=3) is the query
+						// status line, so buffer line L renders at Y = 4 + L.
+						Y:      4 + statement.Line,
+						Width:  4,
+						Height: 1,
+						Focus:  FocusMain,
+					})
+				}
+			}
+		}
+		// Inner content starts after the border row; panel titles are hidden.
+		y := 2
+		switch m.page {
+		case PageConnections:
+			for i := range m.vault.Profiles {
+				boxes = append(boxes, Hitbox{
+					ID:     fmt.Sprintf("connection:%d", i),
+					X:      1,
+					Y:      y + i,
+					Width:  max(1, sidebarWidth-2),
+					Height: 1,
+					Focus:  FocusSidebar,
+					Index:  i,
+				})
+			}
+		case PageBrowser, PageData, PageQuery:
+			visible, _ := m.visibleBrowserNodes(max(1, bodyHeight-2))
+			for row, node := range visible {
+				index := node.DatabaseIdx
+				if node.Kind == navNodeObject || node.Kind == navNodeMeta {
+					index = node.ObjectIdx
+				}
+				boxes = append(boxes, Hitbox{
+					ID:     node.ID,
+					X:      1,
+					Y:      y + row,
+					Width:  max(1, sidebarWidth-2),
+					Height: 1,
+					Focus:  FocusSidebar,
+					Index:  index,
+				})
+			}
+		case PageHistory:
+			for i := range historyEntries(m.history, m.activeProfileID()) {
+				boxes = append(boxes, Hitbox{
+					ID:     fmt.Sprintf("history:%d", i),
+					X:      1,
+					Y:      y + i,
+					Width:  max(1, sidebarWidth-2),
+					Height: 1,
+					Focus:  FocusSidebar,
+					Index:  i,
 				})
 			}
 		}
 	}
-	// Inner content starts after the border row; panel titles are hidden.
-	y := 2
-	switch m.page {
-	case PageConnections:
-		for i := range m.vault.Profiles {
-			boxes = append(boxes, Hitbox{
-				ID:     fmt.Sprintf("connection:%d", i),
-				X:      1,
-				Y:      y + i,
-				Width:  max(1, sidebarWidth-2),
-				Height: 1,
-				Focus:  FocusSidebar,
-				Index:  i,
-			})
-		}
-	case PageBrowser, PageData, PageQuery:
-		visible, _ := m.visibleBrowserNodes(max(1, bodyHeight-2))
-		for row, node := range visible {
-			index := node.DatabaseIdx
-			if node.Kind == navNodeObject || node.Kind == navNodeMeta {
-				index = node.ObjectIdx
-			}
-			boxes = append(boxes, Hitbox{
-				ID:     node.ID,
-				X:      1,
-				Y:      y + row,
-				Width:  max(1, sidebarWidth-2),
-				Height: 1,
-				Focus:  FocusSidebar,
-				Index:  index,
-			})
-		}
-	case PageHistory:
-		for i := range historyEntries(m.history, m.activeProfileID()) {
-			boxes = append(boxes, Hitbox{
-				ID:     fmt.Sprintf("history:%d", i),
-				X:      1,
-				Y:      y + i,
-				Width:  max(1, sidebarWidth-2),
-				Height: 1,
-				Focus:  FocusSidebar,
-				Index:  i,
-			})
-		}
-	}
+	boxes = append(boxes, m.modalRowHits...)
 	m.hitboxes = boxes
 }
 
@@ -215,25 +251,113 @@ func (m *Model) connTabText(i int) string {
 
 const connAddText = " + "
 
-func renderHeader(theme appTheme, m *Model, width int) string {
-	segs := []string{theme.header.Render("TDB")}
+// headerTabHit records the screen position of one clickable header element so the
+// renderer and the hitbox registration stay perfectly in sync.
+type headerTabHit struct {
+	index int // session index, or -1 for the "+" add button
+	x     int
+	width int
+}
+
+// headerTabLayout builds the single-line header (TDB + a horizontally-scrolled
+// window of connection tabs + "+") and the screen positions of every visible,
+// clickable tab. Render and hitbox registration both call this so they can never
+// drift, and an overflowing tab strip scrolls (keeping the active tab visible)
+// instead of wrapping or being clipped away.
+func (m *Model) headerTabLayout(width int) (string, []headerTabHit) {
+	theme := defaultTheme()
+	prefix := theme.header.Render("TDB")
+	x := lipgloss.Width(prefix)
+
 	if len(m.sessions) == 0 {
-		segs = append(segs, theme.status.Render(" no open connection "))
+		line := prefix + theme.status.Render(" no open connection ")
+		addX := lipgloss.Width(line)
+		add := lipgloss.NewStyle().Bold(true).Foreground(theme.tabActiveFg).Background(theme.tabActiveBg).Render(connAddText)
+		line = clipHeaderLine(line+add, width)
+		return line, []headerTabHit{{index: -1, x: addX, width: lipgloss.Width(connAddText)}}
 	}
+
+	widths := make([]int, len(m.sessions))
+	total := 0
 	for i := range m.sessions {
+		widths[i] = lipgloss.Width(m.connTabText(i))
+		total += widths[i]
+	}
+	addW := lipgloss.Width(connAddText)
+	marker := "‹"
+	markerW := lipgloss.Width(marker)
+
+	// Decide the visible window [start,end) of tabs.
+	avail := width - x - addW
+	start, end := 0, len(m.sessions)
+	if total > avail && avail > 0 {
+		budget := avail - 2*markerW // reserve room for ‹ ›
+		active := m.activeSession
+		if active < 0 || active >= len(m.sessions) {
+			active = len(m.sessions) - 1
+		}
+		start, end = active, active+1
+		used := widths[active]
+		for {
+			grew := false
+			if end < len(m.sessions) && used+widths[end] <= budget {
+				used += widths[end]
+				end++
+				grew = true
+			}
+			if start > 0 && used+widths[start-1] <= budget {
+				start--
+				used += widths[start-1]
+				grew = true
+			}
+			if !grew {
+				break
+			}
+		}
+	}
+
+	var b strings.Builder
+	b.WriteString(prefix)
+	if start > 0 {
+		b.WriteString(theme.status.Render(marker))
+		x += markerW
+	}
+	hits := make([]headerTabHit, 0, end-start+1)
+	for i := start; i < end; i++ {
 		style := theme.status
 		if i == m.activeSession {
-			style = lipgloss.NewStyle().Bold(true).Foreground(theme.tabActiveFg).Background(theme.tabActiveBg).Padding(0, 0)
+			style = lipgloss.NewStyle().Bold(true).Foreground(theme.tabActiveFg).Background(theme.tabActiveBg)
 		}
-		segs = append(segs, style.Render(m.connTabText(i)))
+		b.WriteString(style.Render(m.connTabText(i)))
+		hits = append(hits, headerTabHit{index: i, x: x, width: widths[i]})
+		x += widths[i]
+	}
+	if end < len(m.sessions) {
+		b.WriteString(theme.status.Render("›"))
+		x += markerW
 	}
 	addStyle := theme.status
 	if m.activeSession < 0 {
 		addStyle = lipgloss.NewStyle().Bold(true).Foreground(theme.tabActiveFg).Background(theme.tabActiveBg)
 	}
-	segs = append(segs, addStyle.Render(connAddText))
-	line := lipgloss.JoinHorizontal(lipgloss.Top, segs...)
-	return lipgloss.NewStyle().Width(width).Render(line)
+	b.WriteString(addStyle.Render(connAddText))
+	hits = append(hits, headerTabHit{index: -1, x: x, width: addW})
+
+	return clipHeaderLine(b.String(), width), hits
+}
+
+// clipHeaderLine keeps the header to exactly one row of the given width.
+func clipHeaderLine(line string, width int) string {
+	line = ansi.Truncate(line, width, "…")
+	if pad := width - ansi.StringWidth(line); pad > 0 {
+		line += strings.Repeat(" ", pad)
+	}
+	return line
+}
+
+func renderHeader(theme appTheme, m *Model, width int) string {
+	line, _ := m.headerTabLayout(width)
+	return line
 }
 
 func renderPanel(theme appTheme, title, body string, focus Focus, active bool, width, height int) string {
@@ -262,7 +386,7 @@ func renderPanel(theme appTheme, title, body string, focus Focus, active bool, w
 func (m *Model) sidebarContent(height, width int) string {
 	switch m.page {
 	case PageConnections:
-		return m.connectionsList()
+		return m.connectionsList(width)
 	case PageBrowser, PageData, PageQuery:
 		return m.browserListVisible(height, width)
 	case PageHistory:
@@ -272,8 +396,54 @@ func (m *Model) sidebarContent(height, width int) string {
 	}
 }
 
+// extractRowHits scans the (panel-content) string for rowMarker-tagged rows,
+// registers a full-width click hitbox at each row's rendered line, strips the
+// markers, and returns the clean string. Working off the actual rendered lines
+// keeps the hitboxes in sync with the floating box's centering/scroll geometry.
+func (m *Model) extractRowHits(content string) string {
+	mainX := m.sidebarWidth()
+	mainWidth := max(34, m.width-mainX)
+	var hits []Hitbox
+	for row, line := range strings.Split(content, "\n") {
+		if !strings.Contains(line, rowMarker) {
+			continue
+		}
+		name := m.dbPickerRowName(line)
+		if name == "" {
+			continue
+		}
+		hits = append(hits, Hitbox{
+			ID:     "db-pick:" + name,
+			X:      mainX,
+			Y:      2 + row, // header row + panel top border precede the content
+			Width:  mainWidth,
+			Height: 1,
+			Focus:  FocusContext,
+		})
+	}
+	m.modalRowHits = hits
+	return strings.ReplaceAll(content, rowMarker, "")
+}
+
+// dbPickerRowName recovers the exact database name from a rendered picker row by
+// matching against the known database list, rather than trying to strip the
+// floating box's border/padding/centering decoration off the line. Each row
+// contains exactly one database name; the longest match wins (so "ai" never
+// shadows "data_ai").
+func (m *Model) dbPickerRowName(line string) string {
+	plain := ansi.Strip(strings.ReplaceAll(line, rowMarker, ""))
+	best := ""
+	for _, name := range m.filteredDatabases() {
+		if name != "" && len(name) > len(best) && strings.Contains(plain, name) {
+			best = name
+		}
+	}
+	return best
+}
+
 func (m *Model) mainContent() string {
 	var b strings.Builder
+	m.modalRowHits = nil // rebuilt below only for modals with clickable rows
 	if m.errBox != nil {
 		return m.errorBoxContent()
 	}
@@ -283,7 +453,10 @@ func (m *Model) mainContent() string {
 	if m.pending != nil {
 		return m.modalContent()
 	}
-	if m.input.SuggestionsVisible() && m.focus != FocusCommand {
+	// The standalone suggestions page is for command-line completion only. A modal
+	// (e.g. the AI panel's @-mention list) renders its own inline suggestions, so
+	// never hijack the whole panel into viewSuggestions while one is open.
+	if m.input.SuggestionsVisible() && m.focus != FocusCommand && m.modal == nil {
 		m.viewSuggestions(&b)
 		return b.String()
 	}
@@ -295,9 +468,9 @@ func (m *Model) mainContent() string {
 	}
 	if m.modal != nil && m.modal.Kind == modalDatabasePicker {
 		if overlay, ok := m.databasePickerOverlay(); ok {
-			return overlay
+			return m.extractRowHits(overlay)
 		}
-		return m.modalContent()
+		return m.extractRowHits(m.modalContent())
 	}
 	if m.modal != nil || m.helpOpen {
 		return m.modalContent()
@@ -313,15 +486,7 @@ func (m *Model) mainContent() string {
 	}
 	switch m.page {
 	case PageUnlock:
-		theme := defaultTheme()
-		b.WriteString(theme.sectionTitle.Render("Unlock config") + "\n")
-		if m.unlockCommand {
-			b.WriteString("Command: " + m.input.Value() + m.renderCursorCell(" ") + "\n")
-			b.WriteString(theme.muted.Render("Only :q is available before unlocking. Esc to go back.") + "\n")
-		} else {
-			b.WriteString("Password: " + strings.Repeat("*", len(m.input.Value())) + m.renderCursorCell(" ") + "\n")
-			b.WriteString(theme.muted.Render("Press : then type q to quit.") + "\n")
-		}
+		return m.unlockBox()
 	case PageConnections:
 		b.WriteString(m.connectionWorkspaceContent())
 	case PageBrowser:
@@ -339,6 +504,45 @@ func (m *Model) mainContent() string {
 	return b.String()
 }
 
+// unlockBox renders the password screen as a centered dialog. On first run it
+// prompts to set, then confirm, a new master password; otherwise it unlocks an
+// existing vault.
+func (m *Model) unlockBox() string {
+	theme := defaultTheme()
+	first := m.firstRun()
+	title := "Unlock config"
+	if first {
+		title = "Set master password"
+	}
+	var body strings.Builder
+	body.WriteString(theme.accent.Render(title) + "\n\n")
+	if m.unlockCommand {
+		body.WriteString("Command: " + m.input.Value() + m.renderCursorCell(" ") + "\n")
+		body.WriteString(theme.muted.Render("Only :q is available before unlocking. Esc to go back."))
+	} else {
+		label := "Password:"
+		hint := "Enter your master password."
+		switch {
+		case first && m.unlockConfirm:
+			label = "Confirm: "
+			hint = "Re-enter the same password to confirm."
+		case first:
+			label = "New password:"
+			hint = "Choose a master password to encrypt your config."
+		}
+		body.WriteString(label + " " + strings.Repeat("*", len(m.input.Value())) + m.renderCursorCell(" ") + "\n")
+		body.WriteString(theme.muted.Render(hint + "  ·  Press : then q to quit."))
+	}
+	box := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(theme.accentColor).
+		Padding(1, 3).
+		Render(body.String())
+	w := max(20, m.workspaceContentWidth())
+	h := max(6, m.mainInnerHeight())
+	return lipgloss.Place(w, h, lipgloss.Center, lipgloss.Center, box)
+}
+
 func (m *Model) connectionWorkspaceContent() string {
 	theme := defaultTheme()
 	if len(m.vault.Profiles) == 0 {
@@ -352,16 +556,29 @@ func (m *Model) connectionWorkspaceContent() string {
 	if profile.ReadOnly {
 		access = theme.badgeRO.Render(" RO ")
 	}
-	row := func(label, value string) string {
-		return theme.muted.Render(fmt.Sprintf("%-10s", label)) + " " + value + "\n"
-	}
 	var b strings.Builder
 	b.WriteString(theme.sectionTitle.Render(profile.ID) + "  " + access + "\n\n")
-	b.WriteString(row("Driver", string(profile.Driver)))
-	b.WriteString(row("Host", fmt.Sprintf("%s:%d", profile.Host, profile.Port)))
-	b.WriteString(row("Database", valueOrDash(profile.Database)))
+	// Single source: connectionDetailRows. ID/Access already appear in the title.
+	for _, kv := range connectionDetailRows(profile) {
+		if kv[0] == "ID" || kv[0] == "Access" {
+			continue
+		}
+		value := kv[1]
+		if lipgloss.Width(value) > 64 {
+			value = ansi.Truncate(value, 64, "…")
+		}
+		b.WriteString(theme.muted.Render(fmt.Sprintf("%-10s", kv[0])) + " " + value + "\n")
+	}
 	return b.String()
 }
+
+// redactedURI masks any password embedded in a connection URI so it is safe to
+// show in the details popup (kept literal "***" rather than url-encoding).
+func redactedURI(uri string) string {
+	return uriPasswordPattern.ReplaceAllString(uri, "$1:***@")
+}
+
+var uriPasswordPattern = regexp.MustCompile(`(://[^:/@]+):[^@/]+@`)
 
 func valueOrDash(s string) string {
 	if s == "" {
@@ -432,7 +649,7 @@ func (m *Model) commandVisible() bool {
 	}
 	// The query history search and database picker popups carry their own
 	// Search: field, so keep the bottom command bar hidden to avoid echoing it.
-	if m.modal != nil && (m.modal.Kind == modalQueryHistorySearch || m.modal.Kind == modalDatabasePicker) {
+	if m.modal != nil && (m.modal.Kind == modalQueryHistorySearch || m.modal.Kind == modalDatabasePicker || m.modal.Kind == modalAIChat) {
 		return false
 	}
 	return m.navSearchActive || m.focus == FocusCommand || m.input.Value() != "" || m.input.SuggestionsVisible()
@@ -443,10 +660,10 @@ func (m *Model) commandLineText() string {
 		return "Password: " + strings.Repeat("*", len(m.input.Value())) + m.renderCursorCell(" ")
 	}
 	if m.navSearchActive {
-		return "Search: " + m.input.Value() + m.renderCursorCell(" ")
+		return "Search: " + m.input.Value() + m.activeInputCursor()
 	}
 	if m.modal != nil && m.modal.Kind == modalHelp {
-		return "Help search: " + m.input.Value() + m.renderCursorCell(" ")
+		return "Help search: " + m.input.Value() + m.activeInputCursor()
 	}
 	if m.form != nil {
 		if m.form.selectingDriver {
@@ -457,7 +674,7 @@ func (m *Model) commandLineText() string {
 		}
 		return "Form: readonly checkbox, Space toggles, Enter saves"
 	}
-	return "Command: " + m.input.Value() + m.renderCursorCell(" ")
+	return "Command: " + m.input.Value() + m.activeInputCursor()
 }
 
 func (m *Model) connectionFormContent() string {
@@ -606,7 +823,10 @@ func (m *Model) errorBoxContent() string {
 		return ""
 	}
 	theme := defaultTheme()
-	return theme.danger.Render(m.errBox.Title + "\n\n" + m.errBox.Message + "\n\n[ Close ]")
+	// Bound the width so the rounded border encloses the (often long) message
+	// instead of overflowing the panel and corrupting the border.
+	inner := clamp(m.workspaceContentWidth()-4, 24, 100)
+	return theme.danger.Width(inner).Render(m.errBox.Title + "\n\n" + m.errBox.Message + "\n\n[ Close ]")
 }
 
 func displayFieldValue(field connectionFormField) string {
@@ -638,43 +858,55 @@ func (m *Model) renderFormFieldValue(field connectionFormField, active bool) str
 	return b.String()
 }
 
+// modalMarkerRow returns the screen Y of the first line of content containing
+// marker (ANSI-stripped), where content's first line renders at baseY. Returns -1
+// when the marker is absent. This keeps modal/form hitboxes pinned to the actual
+// rendered rows instead of hardcoded offsets.
+func modalMarkerRow(content, marker string, baseY int) int {
+	for i, line := range strings.Split(content, "\n") {
+		if strings.Contains(ansi.Strip(line), marker) {
+			return baseY + i
+		}
+	}
+	return -1
+}
+
 func (m *Model) connectionFormHitboxes(contextX, contextWidth int) HitboxRegistry {
-	x := contextX + 2
-	width := max(8, contextWidth-4)
+	// The form renders inside modalBox in the main panel: panel content (Y=2) +
+	// modalBox top border (1) + the "Connection" title line (1) put the form body's
+	// first line at Y=4. Hitboxes are located by matching the actual rendered rows.
+	const baseY = 4
+	body := m.connectionFormContent()
+	rowX := contextX + 2
+	rowW := max(8, contextWidth-4)
 	boxes := HitboxRegistry{}
 	if m.form.selectingDriver {
-		for i, driver := range connectionFormDrivers {
-			boxes = append(boxes, Hitbox{
-				ID:      "form-driver:" + string(driver),
-				X:       x,
-				Y:       4 + i,
-				Width:   width,
-				Height:  1,
-				Focus:   FocusContext,
-				Payload: string(driver),
-			})
+		for _, driver := range connectionFormDrivers {
+			if y := modalMarkerRow(body, string(driver), baseY); y >= 0 {
+				boxes = append(boxes, Hitbox{ID: "form-driver:" + string(driver), X: rowX, Y: y, Width: rowW, Height: 1, Focus: FocusContext, Payload: string(driver)})
+			}
 		}
-		boxes = append(boxes, Hitbox{ID: "form:cancel", X: x, Y: 6 + len(connectionFormDrivers), Width: 12, Height: 1, Focus: FocusContext, Action: actionCancel})
+		if y := modalMarkerRow(body, "[ Cancel ]", baseY); y >= 0 {
+			boxes = append(boxes, Hitbox{ID: "form:cancel", X: rowX, Y: y, Width: 12, Height: 1, Focus: FocusContext, Action: actionCancel})
+		}
 		return boxes
 	}
 	for i, field := range m.form.fields {
-		boxes = append(boxes, Hitbox{
-			ID:      "form-field:" + field.Name,
-			X:       x,
-			Y:       5 + i,
-			Width:   width,
-			Height:  1,
-			Focus:   FocusContext,
-			Index:   i,
-			Payload: field.Name,
-		})
+		if y := modalMarkerRow(body, field.Label+":", baseY); y >= 0 {
+			boxes = append(boxes, Hitbox{ID: "form-field:" + field.Name, X: rowX, Y: y, Width: rowW, Height: 1, Focus: FocusContext, Index: i, Payload: field.Name})
+		}
 	}
-	controlsY := 6 + len(m.form.fields)
-	boxes = append(boxes,
-		Hitbox{ID: "form-readonly", X: x, Y: controlsY - 1, Width: width, Height: 1, Focus: FocusContext},
-		Hitbox{ID: "form:save", X: x, Y: controlsY + 1, Width: 10, Height: 1, Focus: FocusContext, Action: actionConfirm},
-		Hitbox{ID: "form:cancel", X: x + 12, Y: controlsY + 1, Width: 12, Height: 1, Focus: FocusContext, Action: actionCancel},
-	)
+	if y := modalMarkerRow(body, "Readonly", baseY); y >= 0 {
+		boxes = append(boxes, Hitbox{ID: "form-readonly", X: rowX, Y: y, Width: rowW, Height: 1, Focus: FocusContext})
+	}
+	if y := modalMarkerRow(body, "[ Save ]", baseY); y >= 0 {
+		// Save and Cancel share one row; content begins at contextX+4 (panel + box
+		// borders and padding).
+		boxes = append(boxes,
+			Hitbox{ID: "form:save", X: contextX + 4, Y: y, Width: 8, Height: 1, Focus: FocusContext, Action: actionConfirm},
+			Hitbox{ID: "form:cancel", X: contextX + 14, Y: y, Width: 10, Height: 1, Focus: FocusContext, Action: actionCancel},
+		)
+	}
 	return boxes
 }
 
@@ -699,9 +931,11 @@ func (m *Model) renderConnectionRow(profile config.Profile, prefix string, width
 	}
 
 	if selected {
+		// body is plain text, so cellSlice (not ANSI-aware) clips it safely to one
+		// line before the highlight style fills the row width.
 		body := "> " + prefix + indicator + " " + text
 		if width > 0 {
-			body = padCells(body, width)
+			body = padCells(cellSlice(body, 0, width), width)
 		}
 		if focused {
 			return theme.selected.Render(body)
@@ -712,6 +946,12 @@ func (m *Model) renderConnectionRow(profile config.Profile, prefix string, width
 	lead := indicator
 	if glyph != "" && color != "" {
 		lead = lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render(glyph)
+	}
+	if width > 0 {
+		// Clip the plain variable part (text) to the remaining width so the styled
+		// glyph isn't sliced and the row never wraps.
+		head := "  " + prefix + indicator + " "
+		text = cellSlice(text, 0, max(0, width-lipgloss.Width(head)))
 	}
 	line := "  " + prefix + lead + " " + text
 	if width > 0 {
@@ -735,13 +975,17 @@ func connectionEndpoint(profile config.Profile) string {
 	return ""
 }
 
-func (m *Model) connectionsList() string {
+func (m *Model) connectionsList(width int) string {
 	if len(m.vault.Profiles) == 0 {
 		return defaultTheme().muted.Render("no saved profiles")
 	}
 	var b strings.Builder
 	for i, profile := range m.vault.Profiles {
-		b.WriteString(m.renderConnectionRow(profile, "", 0, i == m.connectionIndex, m.focus == FocusSidebar) + "\n")
+		// The connections list is the primary surface on this page, so the selected
+		// row always shows the bright highlight (never the dim "unfocused" variant).
+		// A real width clips each row to one line so it never wraps and breaks the
+		// per-row click hitboxes.
+		b.WriteString(m.renderConnectionRow(profile, "", width, i == m.connectionIndex, true) + "\n")
 	}
 	return b.String()
 }
@@ -972,26 +1216,30 @@ func (m *Model) footerHints(theme appTheme) string {
 	switch m.page {
 	case PageUnlock:
 		return hint([2]string{"enter", "unlock"}, [2]string{":q", "quit"})
+	case PageGame:
+		return hint([2]string{"space", "jump/start"}, [2]string{"esc", "back"}, [2]string{":q", "quit"})
 	case PageConnections:
-		return hint([2]string{"↑↓", "select"}, [2]string{"enter", "open"}, [2]string{"n", "new"}, [2]string{"e", "edit"}, [2]string{"d", "delete"}, [2]string{"t", "test"}, [2]string{":", "cmd"}, [2]string{"?", "help"})
+		return hint([2]string{"j/k", "select"}, [2]string{"h/l", "cols"}, [2]string{"enter", "open"}, [2]string{"^J", "details"}, [2]string{"/", "search"}, [2]string{"n", "new"}, [2]string{"?", "help"})
 	}
 	if m.focus == FocusSidebar {
-		return hint([2]string{"↑↓", "select"}, [2]string{"enter", "open/expand"}, [2]string{"/", "search"}, [2]string{"tab", "workspace"}, [2]string{":", "cmd"}, [2]string{"?", "help"})
+		return hint([2]string{"j/k", "select"}, [2]string{"gg/G", "top/bot"}, [2]string{"enter", "open/expand"}, [2]string{"/", "search"}, [2]string{":query", "query"}, [2]string{"^l", "workspace"}, [2]string{":", "cmd"}, [2]string{"?", "help"})
 	}
 	if tab := m.activeWorkspaceTab(); tab != nil {
 		if tab.Kind == workspaceTabQuery {
 			switch {
 			case tab.RowDetail:
-				return hint([2]string{"↑↓/hl", "move"}, [2]string{"v", "select"}, [2]string{"y", "copy"}, [2]string{"esc", "back"})
+				return hint([2]string{"hjkl", "move"}, [2]string{"v", "select"}, [2]string{"y", "copy"}, [2]string{"/", "search"}, [2]string{"esc", "back"})
 			case tab.WorkspaceFocus == workspaceFocusResult:
-				return hint([2]string{"↑↓", "select"}, [2]string{"enter", "row"}, [2]string{"^s", "history"}, [2]string{"i", "edit"}, [2]string{"tab", "nav"})
+				return hint([2]string{"j/k", "select"}, [2]string{"v", "select"}, [2]string{"y", "copy"}, [2]string{"/", "search"}, [2]string{"enter", "row"}, [2]string{"^k", "AI"}, [2]string{"^h", "sidebar"})
+			case tab.QuerySuggestionsVisible:
+				return hint([2]string{"Tab/⇧Tab", "option"}, [2]string{"enter", "accept"}, [2]string{"esc", "close"})
 			default:
-				return hint([2]string{"enter", "run"}, [2]string{"^j", "newline"}, [2]string{"^s", "history"}, [2]string{"esc", "normal"}, [2]string{"tab", "nav"})
+				return hint([2]string{"Tab", "complete"}, [2]string{"enter", "run"}, [2]string{"^j", "newline"}, [2]string{"^s", "history"}, [2]string{"^k", "AI"}, [2]string{"esc", "normal"})
 			}
 		}
-		return hint([2]string{"hjkl", "move"}, [2]string{"v", "select"}, [2]string{"y", "copy"}, [2]string{"tab", "nav"}, [2]string{"?", "help"})
+		return hint([2]string{"hjkl", "move"}, [2]string{"gg/G", "top/bot"}, [2]string{"v", "select"}, [2]string{"y", "copy"}, [2]string{"/", "search"}, [2]string{"^k", "AI"}, [2]string{"^h", "sidebar"})
 	}
-	return hint([2]string{"tab", "switch"}, [2]string{":", "cmd"}, [2]string{"?", "help"}, [2]string{":q", "quit"})
+	return hint([2]string{"^h/^l", "panel"}, [2]string{":", "cmd"}, [2]string{"?", "help"}, [2]string{":q", "quit"})
 }
 
 func commandSuggestionHeight(m *Model) int {

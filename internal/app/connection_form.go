@@ -139,6 +139,22 @@ func (f *connectionForm) backspace() {
 	field.Cursor = prev
 }
 
+// backspaceWord deletes the word before the cursor in the active field — bound to
+// Ctrl+Backspace / Alt+Backspace.
+func (f *connectionForm) backspaceWord() {
+	field, ok := f.currentField()
+	if !ok {
+		return
+	}
+	c := clamp(field.Cursor, 0, len(field.Value))
+	if c == 0 {
+		return
+	}
+	prev := queryPreviousWord(field.Value, c)
+	field.Value = field.Value[:prev] + field.Value[c:]
+	field.Cursor = prev
+}
+
 func (f *connectionForm) deleteForward() {
 	field, ok := f.currentField()
 	if !ok {
@@ -309,7 +325,7 @@ func connectionFieldsForDriver(driver config.Driver) []connectionFormField {
 			{Name: "port", Label: "Port", Required: true},
 			{Name: "user", Label: "User", Required: true},
 			{Name: "password", Label: "Password", Secret: true},
-			{Name: "database", Label: "Database", Required: true},
+			{Name: "database", Label: "Database"},
 		}
 	}
 }

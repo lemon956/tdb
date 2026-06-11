@@ -21,6 +21,7 @@ type navNodeKind string
 
 const (
 	navNodeConnection navNodeKind = "connection"
+	navNodeCatalog    navNodeKind = "catalog"
 	navNodeDatabase   navNodeKind = "database"
 	navNodeObject     navNodeKind = "object"
 	navNodeMeta       navNodeKind = "metadata"
@@ -30,12 +31,24 @@ type navNode struct {
 	ID          string
 	Kind        navNodeKind
 	Label       string
+	Catalog     string
 	Database    string
 	Object      db.Object
 	Target      db.Target
 	Depth       int
+	CatalogIdx  int
 	DatabaseIdx int
 	ObjectIdx   int
+}
+
+// scopeKey is the map key for per-(catalog,database) caches. For the internal
+// catalog (and non-Doris drivers) it degrades to the bare database name, so
+// existing two-level callers/behaviour are unchanged.
+func (m *Model) scopeKey(catalog, database string) string {
+	if catalog == "" || strings.EqualFold(catalog, "internal") {
+		return database
+	}
+	return catalog + "\x00" + database
 }
 
 func (m *Model) ensureNavigationState() {
@@ -51,10 +64,17 @@ func (m *Model) ensureNavigationState() {
 	if m.expandedMeta == nil {
 		m.expandedMeta = map[string]bool{}
 	}
+	if m.expandedCatalogs == nil {
+		m.expandedCatalogs = map[string]bool{}
+	}
+	if m.catalogDatabases == nil {
+		m.catalogDatabases = map[string][]string{}
+	}
 	if m.selectedDB != "" && len(m.objects) > 0 {
-		m.databaseObjects[m.selectedDB] = m.objects
-		if _, known := m.expandedDBs[m.selectedDB]; !known {
-			m.expandedDBs[m.selectedDB] = true
+		key := m.scopeKey(m.selectedCatalog, m.selectedDB)
+		m.databaseObjects[key] = m.objects
+		if _, known := m.expandedDBs[key]; !known {
+			m.expandedDBs[key] = true
 		}
 	}
 }
@@ -87,9 +107,10 @@ func (m *Model) browserNodes() []navNode {
 		})
 		dbDepth = 1
 	}
-	if len(m.databases) == 0 && len(m.objects) > 0 {
+	externals := m.externalCatalogs()
+	if len(m.databases) == 0 && len(m.objects) > 0 && len(externals) == 0 {
 		for objectIndex, object := range m.objects {
-			target := m.targetForObject(m.selectedDB, object)
+			target := m.targetForObject("", m.selectedDB, object)
 			nodes = append(nodes, navNode{
 				ID:        fmt.Sprintf("object:%d", objectIndex),
 				Kind:      navNodeObject,
@@ -103,42 +124,97 @@ func (m *Model) browserNodes() []navNode {
 		}
 		return nodes
 	}
-	for dbIndex, database := range m.databases {
-		expanded := m.expandedDBs[database]
+	// The built-in "internal" catalog is flattened: its databases sit at the top
+	// level exactly as before catalogs existed. m.databases always holds the
+	// internal catalog's databases. Only EXTERNAL catalogs (jdbc/hive/es) get a
+	// collapsible catalog group node, so connections without external catalogs
+	// look identical to the old two-level tree.
+	dbIndex := 0
+	for localIdx, database := range m.databases {
+		nodes = m.appendDatabaseNode(nodes, "", database, dbIndex, localIdx, dbDepth, &objectCount)
+		dbIndex++
+	}
+	for catIndex, catalog := range externals {
+		expanded := m.expandedCatalogs[catalog]
 		marker := m.icons.Collapsed
 		if expanded {
 			marker = m.icons.Expanded
 		}
 		nodes = append(nodes, navNode{
-			ID:          fmt.Sprintf("database:%d", dbIndex),
-			Kind:        navNodeDatabase,
-			Label:       fmt.Sprintf("%s %s %s", marker, m.icons.Database, database),
-			Database:    database,
-			Depth:       dbDepth,
-			DatabaseIdx: dbIndex,
+			ID:         fmt.Sprintf("catalog:%d", catIndex),
+			Kind:       navNodeCatalog,
+			Label:      fmt.Sprintf("%s %s %s", marker, m.icons.Catalog, catalog),
+			Catalog:    catalog,
+			Depth:      dbDepth,
+			CatalogIdx: catIndex,
 		})
 		if !expanded {
 			continue
 		}
-		objects := m.databaseObjects[database]
-		for objectIndex, object := range objects {
-			target := m.targetForObject(database, object)
-			nodes = append(nodes, navNode{
-				ID:          fmt.Sprintf("object:%d", objectCount),
-				Kind:        navNodeObject,
-				Label:       m.objectNodeLabel(object),
-				Database:    database,
-				Object:      object,
-				Target:      target,
-				Depth:       dbDepth + 1,
-				DatabaseIdx: dbIndex,
-				ObjectIdx:   objectIndex,
-			})
-			objectCount++
-			if m.expandedMeta[targetKey(target)] {
-				nodes = append(nodes, navNode{ID: fmt.Sprintf("metadata:%d", objectCount), Kind: navNodeMeta, Label: m.icons.Metadata + " metadata", Database: database, Target: target, Depth: dbDepth + 2, DatabaseIdx: dbIndex, ObjectIdx: objectIndex})
-				nodes = append(nodes, navNode{ID: fmt.Sprintf("fields:%d", objectCount), Kind: navNodeMeta, Label: m.icons.Metadata + " fields", Database: database, Target: target, Depth: dbDepth + 2, DatabaseIdx: dbIndex, ObjectIdx: objectIndex})
-				nodes = append(nodes, navNode{ID: fmt.Sprintf("indexes:%d", objectCount), Kind: navNodeMeta, Label: m.icons.Metadata + " indexes", Database: database, Target: target, Depth: dbDepth + 2, DatabaseIdx: dbIndex, ObjectIdx: objectIndex})
+		for localIdx, database := range m.catalogDatabases[catalog] {
+			nodes = m.appendDatabaseNode(nodes, catalog, database, dbIndex, localIdx, dbDepth+1, &objectCount)
+			dbIndex++
+		}
+	}
+	return nodes
+}
+
+// externalCatalogs returns the non-internal Doris catalogs. The internal catalog
+// is flattened into the top-level database list, so only these get a group node.
+func (m *Model) externalCatalogs() []string {
+	if len(m.catalogs) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(m.catalogs))
+	for _, catalog := range m.catalogs {
+		if !strings.EqualFold(catalog, "internal") {
+			out = append(out, catalog)
+		}
+	}
+	return out
+}
+
+// appendDatabaseNode emits a database node and, when expanded, its object and
+// metadata children. catalog is "" for the flat (non-catalog) layout. dbIndex is
+// a tree-global database counter (for unique node IDs); localIdx is the index of
+// the database within its own list (catalog's or the flat list).
+func (m *Model) appendDatabaseNode(nodes []navNode, catalog, database string, dbIndex, localIdx, depth int, objectCount *int) []navNode {
+	key := m.scopeKey(catalog, database)
+	expanded := m.expandedDBs[key]
+	marker := m.icons.Collapsed
+	if expanded {
+		marker = m.icons.Expanded
+	}
+	nodes = append(nodes, navNode{
+		ID:          fmt.Sprintf("database:%d", dbIndex),
+		Kind:        navNodeDatabase,
+		Label:       fmt.Sprintf("%s %s %s", marker, m.icons.Database, database),
+		Catalog:     catalog,
+		Database:    database,
+		Depth:       depth,
+		DatabaseIdx: localIdx,
+	})
+	if !expanded {
+		return nodes
+	}
+	for objectIndex, object := range m.databaseObjects[key] {
+		target := m.targetForObject(catalog, database, object)
+		nodes = append(nodes, navNode{
+			ID:          fmt.Sprintf("object:%d", *objectCount),
+			Kind:        navNodeObject,
+			Label:       m.objectNodeLabel(object),
+			Catalog:     catalog,
+			Database:    database,
+			Object:      object,
+			Target:      target,
+			Depth:       depth + 1,
+			DatabaseIdx: localIdx,
+			ObjectIdx:   objectIndex,
+		})
+		*objectCount++
+		if m.expandedMeta[targetKey(target)] {
+			for _, label := range []string{"metadata", "fields", "indexes"} {
+				nodes = append(nodes, navNode{ID: fmt.Sprintf("%s:%d", label, *objectCount), Kind: navNodeMeta, Label: m.icons.Metadata + " " + label, Catalog: catalog, Database: database, Target: target, Depth: depth + 2, DatabaseIdx: localIdx, ObjectIdx: objectIndex})
 			}
 		}
 	}
@@ -203,6 +279,7 @@ func (m *Model) clearNavigationSearch() {
 
 type navSearchMatch struct {
 	Kind     navNodeKind
+	Catalog  string
 	Database string
 	Object   db.Object
 }
@@ -229,8 +306,11 @@ func (m *Model) jumpNavigationSearch(next bool) {
 	}
 	m.navSearchMatchIndex %= len(matches)
 	match := matches[m.navSearchMatchIndex]
+	if match.Catalog != "" {
+		m.expandedCatalogs[match.Catalog] = true
+	}
 	if match.Kind == navNodeObject {
-		m.expandedDBs[match.Database] = true
+		m.expandedDBs[m.scopeKey(match.Catalog, match.Database)] = true
 	}
 	m.focus = FocusSidebar
 	if !m.focusSearchMatch(match) {
@@ -248,15 +328,31 @@ func (m *Model) navigationSearchMatches(query string) []navSearchMatch {
 			matches = append(matches, navSearchMatch{Kind: navNodeConnection})
 		}
 	}
-	for _, database := range m.databases {
-		if strings.Contains(strings.ToLower(database), query) {
-			matches = append(matches, navSearchMatch{Kind: navNodeDatabase, Database: database})
-		}
-		for _, object := range m.databaseObjects[database] {
-			haystack := strings.ToLower(database + " " + object.Name + " " + string(object.Type))
-			if strings.Contains(haystack, query) {
-				matches = append(matches, navSearchMatch{Kind: navNodeObject, Database: database, Object: object})
+	if len(m.catalogs) > 0 {
+		for _, catalog := range m.catalogs {
+			if strings.Contains(strings.ToLower(catalog), query) {
+				matches = append(matches, navSearchMatch{Kind: navNodeCatalog, Catalog: catalog})
 			}
+			for _, database := range m.catalogDatabases[catalog] {
+				matches = m.appendDatabaseSearchMatches(matches, catalog, database, query)
+			}
+		}
+		return matches
+	}
+	for _, database := range m.databases {
+		matches = m.appendDatabaseSearchMatches(matches, "", database, query)
+	}
+	return matches
+}
+
+func (m *Model) appendDatabaseSearchMatches(matches []navSearchMatch, catalog, database, query string) []navSearchMatch {
+	if strings.Contains(strings.ToLower(database), query) {
+		matches = append(matches, navSearchMatch{Kind: navNodeDatabase, Catalog: catalog, Database: database})
+	}
+	for _, object := range m.databaseObjects[m.scopeKey(catalog, database)] {
+		haystack := strings.ToLower(database + " " + object.Name + " " + string(object.Type))
+		if strings.Contains(haystack, query) {
+			matches = append(matches, navSearchMatch{Kind: navNodeObject, Catalog: catalog, Database: database, Object: object})
 		}
 	}
 	return matches
@@ -271,14 +367,20 @@ func (m *Model) focusSearchMatch(match navSearchMatch) bool {
 				m.syncBrowserSelectionFromCursor()
 				return true
 			}
+		case navNodeCatalog:
+			if node.Kind == navNodeCatalog && node.Catalog == match.Catalog {
+				m.browserCursor = i
+				m.syncBrowserSelectionFromCursor()
+				return true
+			}
 		case navNodeDatabase:
-			if node.Kind == navNodeDatabase && node.Database == match.Database {
+			if node.Kind == navNodeDatabase && node.Catalog == match.Catalog && node.Database == match.Database {
 				m.browserCursor = i
 				m.syncBrowserSelectionFromCursor()
 				return true
 			}
 		case navNodeObject:
-			if node.Kind == navNodeObject && node.Database == match.Database && node.Object.Name == match.Object.Name && node.Object.Type == match.Object.Type {
+			if node.Kind == navNodeObject && node.Catalog == match.Catalog && node.Database == match.Database && node.Object.Name == match.Object.Name && node.Object.Type == match.Object.Type {
 				m.browserCursor = i
 				m.syncBrowserSelectionFromCursor()
 				return true
@@ -340,16 +442,26 @@ func (m *Model) visibleBrowserNodes(limit int) ([]navNode, int) {
 	return nodes[offset:end], offset
 }
 
-func (m *Model) targetForObject(database string, object db.Object) db.Target {
+func (m *Model) targetForObject(catalog, database string, object db.Object) db.Target {
 	targetType := object.Type
 	if targetType == "" {
 		targetType = db.ObjectTable
 	}
-	target := db.Target{Database: database, Name: object.Name, Type: targetType}
+	target := db.Target{Catalog: normalizedCatalog(catalog), Database: database, Name: object.Name, Type: targetType}
 	if target.Type == db.ObjectKey {
 		target.Database = ""
 	}
 	return target
+}
+
+// normalizedCatalog collapses the built-in catalog to "" so targets in the
+// internal catalog (and non-Doris drivers) compare/key identically to the old
+// two-level world.
+func normalizedCatalog(catalog string) string {
+	if strings.EqualFold(catalog, "internal") {
+		return ""
+	}
+	return catalog
 }
 
 func targetKey(target db.Target) string {
@@ -357,55 +469,133 @@ func targetKey(target db.Target) string {
 }
 
 func sameTarget(left, right db.Target) bool {
-	return left.Database == right.Database &&
+	return left.Catalog == right.Catalog &&
+		left.Database == right.Database &&
 		left.Schema == right.Schema &&
 		left.Name == right.Name &&
 		left.Type == right.Type
 }
 
-func (m *Model) loadObjectsForDatabase(ctx context.Context, database string) error {
+func (m *Model) loadObjectsForDatabase(ctx context.Context, catalog, database string) error {
 	if m.adapter == nil {
 		return fmt.Errorf("no active connection")
 	}
 	ctx, cancel := m.dbContext(ctx)
 	defer cancel()
-	objects, err := m.adapter.ListObjects(ctx, db.Scope{Database: database})
+	objects, err := m.adapter.ListObjects(ctx, db.Scope{Catalog: normalizedCatalog(catalog), Database: database})
 	if err != nil {
 		return err
 	}
 	m.ensureNavigationState()
-	m.databaseObjects[database] = objects
-	if m.selectedDB == database {
+	key := m.scopeKey(catalog, database)
+	m.databaseObjects[key] = objects
+	if m.selectedDB == database && m.selectedCatalog == catalog {
 		m.objects = objects
 		m.objectIndex = 0
 	}
 	return nil
 }
 
-func (m *Model) toggleDatabase(ctx context.Context, index int) {
-	if len(m.databases) == 0 {
+// toggleCatalog expands/collapses a Doris catalog, lazily loading its databases
+// on first expand. A permission error is swallowed (the catalog stays empty)
+// rather than breaking the rest of the tree.
+func (m *Model) toggleCatalog(ctx context.Context, catalog string) {
+	m.ensureNavigationState()
+	if m.expandedCatalogs[catalog] {
+		m.expandedCatalogs[catalog] = false
+		m.message = "collapsed " + catalog
+		return
+	}
+	if _, loaded := m.catalogDatabases[catalog]; !loaded {
+		provider, ok := m.adapter.(db.CatalogProvider)
+		if !ok {
+			m.message = "catalogs not supported"
+			return
+		}
+		dctx, cancel := m.dbContext(ctx)
+		databases, err := provider.ListDatabasesInCatalog(dctx, catalog)
+		cancel()
+		if err != nil {
+			if isPermissionError(err) {
+				m.catalogDatabases[catalog] = []string{}
+				m.expandedCatalogs[catalog] = true
+				m.message = "no access to catalog " + catalog
+				return
+			}
+			m.message = err.Error()
+			return
+		}
+		m.catalogDatabases[catalog] = databases
+	}
+	// m.databases stays the internal catalog's flat list; an external catalog's
+	// databases live only in catalogDatabases[catalog]. Only track selection.
+	m.selectedCatalog = catalog
+	m.expandedCatalogs[catalog] = true
+	m.bindActiveQueryTabToSelection()
+	m.message = "expanded " + catalog
+}
+
+func (m *Model) toggleDatabase(ctx context.Context, catalog, database string) {
+	if database == "" {
 		m.message = "no database available"
 		return
 	}
 	m.ensureNavigationState()
-	index = clamp(index, 0, len(m.databases)-1)
-	database := m.databases[index]
-	m.databaseIndex = index
-	m.setBrowserCursorByNodeID(fmt.Sprintf("database:%d", index))
-	if m.expandedDBs[database] {
-		m.expandedDBs[database] = false
+	key := m.scopeKey(catalog, database)
+	if m.expandedDBs[key] {
+		m.expandedDBs[key] = false
 		m.message = "collapsed " + database
 		return
 	}
+	// m.databases is left as the internal catalog's flat list; only update the
+	// active selection so query context follows the sidebar.
+	m.selectedCatalog = catalog
 	m.selectedDB = database
-	if err := m.loadObjectsForDatabase(ctx, database); err != nil {
+	if err := m.loadObjectsForDatabase(ctx, catalog, database); err != nil {
+		if isPermissionError(err) {
+			m.databaseObjects[key] = []db.Object{}
+			m.expandedDBs[key] = true
+			m.bindActiveQueryTabToSelection()
+			m.message = "no access to " + database
+			return
+		}
 		m.message = err.Error()
 		return
 	}
-	m.expandedDBs[database] = true
-	m.objects = m.databaseObjects[database]
+	m.expandedDBs[key] = true
+	m.objects = m.databaseObjects[key]
 	m.objectIndex = 0
+	m.bindActiveQueryTabToSelection()
 	m.message = "expanded " + database
+}
+
+// bindActiveQueryTabToSelection makes the active query tab follow the sidebar's
+// current catalog/database — unless the user pinned it via the database picker.
+// Called on activation (expand/open), not on cursor movement.
+func (m *Model) bindActiveQueryTabToSelection() {
+	tab := m.activeWorkspaceTab()
+	if tab == nil || tab.Kind != workspaceTabQuery || tab.QueryDatabasePinned {
+		return
+	}
+	if m.selectedDB == "" {
+		return
+	}
+	tab.QueryCatalog = m.selectedCatalog
+	tab.QueryDatabase = m.selectedDB
+	m.ensureQueryObjectsLoaded(m.selectedCatalog, m.selectedDB)
+	m.syncActiveTabState()
+}
+
+// isPermissionError reports whether an error is a privilege/access denial, so
+// the UI can silently skip the object instead of surfacing a red error.
+func isPermissionError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "access denied") ||
+		strings.Contains(msg, "denied") ||
+		strings.Contains(msg, "permission")
 }
 
 func (m *Model) openPreview(ctx context.Context, target db.Target) {

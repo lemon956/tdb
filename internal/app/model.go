@@ -33,6 +33,7 @@ const (
 	PageQuery       Page = "query"
 	PageHistory     Page = "history"
 	PageHelp        Page = "help"
+	PageGame        Page = "game" // fallback dino-runner when leaving the picker
 )
 
 type Options struct {
@@ -55,6 +56,9 @@ type Model struct {
 	input                CommandInput
 	unlockCommand        bool   // unlock screen: typing a command (quit-only)
 	unlockPasswordDraft  string // password preserved while in unlock command mode
+	unlockConfirm        bool   // first-run: entering the confirmation password
+	unlockFirstPassword  string // first-run: the password awaiting confirmation
+	navPendingG          bool   // a leading "g" was pressed in a list (awaiting "gg")
 	message              string
 	lastCopiedText       string
 	form                 *connectionForm
@@ -73,44 +77,89 @@ type Model struct {
 	hitboxes             HitboxRegistry
 	icons                IconSet
 
-	activeProfile       *config.Profile
-	adapter             db.Adapter
-	databases           []string
-	objects             []db.Object
-	databaseObjects     map[string][]db.Object
-	expandedDBs         map[string]bool
-	expandedMeta        map[string]bool
-	selectedDB          string
-	connectionIndex     int
-	databaseIndex       int
-	objectIndex         int
-	browserCursor       int
-	navVerticalOffset   int
-	navHorizontalOffset int
-	navSearchActive     bool
-	navSearchQuery      string
-	navSearchMatchIndex int
-	target              db.Target
-	result              result.Set
-	resultView          ResultView
-	workspaceMode       workspaceMode
-	workspaceTabs       []workspaceTab
-	activeTabIndex      int
-	nextQueryTabID      int
-	queryFieldCache     map[string][]suggest.Field
-	helpSearch          string
-	redisCursor         uint64
-	redisPattern        string
-	historyIndex        int
-	queryTimeout        time.Duration      // 0 = no timeout (Esc to cancel)
-	cancelOp            context.CancelFunc // cancels the in-flight async op
-	cursorBlinkOn       bool
-	pending             *pendingAction
-	loading             loadingState
-	nextCmd             tea.Cmd
+	activeProfile     *config.Profile
+	adapter           db.Adapter
+	catalogs          []string            // Doris external catalogs; empty = no catalog layer
+	expandedCatalogs  map[string]bool     // which catalogs show their databases
+	catalogDatabases  map[string][]string // catalog -> its database names (lazy)
+	selectedCatalog   string              // catalog the active database belongs to
+	databases         []string
+	objects           []db.Object
+	databaseObjects   map[string][]db.Object // keyed by scopeKey(catalog, database)
+	expandedDBs       map[string]bool        // keyed by scopeKey(catalog, database)
+	expandedMeta      map[string]bool
+	selectedDB        string
+	connectionIndex   int
+	connectionsView   ResultView // VisiData-style connections table: column/row scroll
+	connectionsDetail bool       // connection detail popup open (Ctrl+Enter)
+	connectionsAnchor int        // row-visual anchor for v/y copy
+	connectionsVisual bool       // row-visual ("copy mode") active in the table
+	// Detail popup (Field/Value table) cursor state — mirrors the mysql result page.
+	connectionsDetailIndex  int
+	connectionsDetailView   ResultView
+	connectionsDetailAnchor int
+	connectionsDetailVisual bool
+	databaseIndex           int
+	objectIndex             int
+	browserCursor           int
+	navVerticalOffset       int
+	navHorizontalOffset     int
+	navSearchActive         bool
+	navSearchQuery          string
+	navSearchMatchIndex     int
+	target                  db.Target
+	result                  result.Set
+	resultView              ResultView
+	workspaceMode           workspaceMode
+	workspaceTabs           []workspaceTab
+	activeTabIndex          int
+	nextQueryTabID          int
+	queryFieldCache         map[string][]suggest.Field
+	helpSearch              string
+	redisCursor             uint64
+	redisPattern            string
+	historyIndex            int
+	queryTimeout            time.Duration      // 0 = no timeout (Esc to cancel)
+	cancelOp                context.CancelFunc // cancels the in-flight async op
+	cursorBlinkOn           bool
+	pending                 *pendingAction
+	loading                 loadingState
+	nextCmd                 tea.Cmd
 
 	sessions      []connSession // one per open connection
 	activeSession int           // index into sessions, or -1 for the manager
+
+	aiSessions    map[string]*aiSession // AI chat history keyed by profileID + catalog/database
+	aiSchemaCache map[string]string     // table columns text, keyed by driver+catalog+db+table
+	aiSQLChoices  []string              // SQL blocks offered by the ctrl+y picker
+	modalRowHits  []Hitbox              // clickable rows of the active modal (e.g. db picker)
+
+	// Mouse drag-selection (left-drag to select, auto-copy on release). Bounds are
+	// the column range of the panel the drag started in, so a selection never
+	// bleeds into the other panel's columns.
+	selecting      bool
+	selActive      bool // a finished selection is still highlighted (until next press)
+	selAnchorX     int
+	selAnchorY     int
+	selX           int
+	selY           int
+	selMinX        int
+	selMaxX        int
+	mouseDownX     int
+	mouseDownY     int
+	mouseMoved     bool
+	lastFrameLines []string // last rendered frame (clean), for selection extraction
+
+	// `/` search over the active grid/detail view.
+	viewSearchInput   bool
+	viewSearchQuery   string
+	viewSearchRows    []string
+	viewSearchMatches []int
+	viewSearchIndex   int
+	viewSearchOrigin  int
+	viewSearchMoveTo  func(int)
+
+	game dinoGame // fallback dino-runner state (PageGame)
 }
 
 type pendingAction struct {
@@ -165,6 +214,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.loading.frame++
 		}
 		return m, spinnerTickCmd()
+	case gameTickMsg:
+		if m.page == PageGame && m.game.active {
+			m.game.advance()
+			return m, gameTickCmd(m.game.frameInterval())
+		}
+		return m, nil // stop re-scheduling when not actively playing
 	case asyncResultMsg:
 		msg.apply(m)
 		m.finishLoading()
@@ -176,6 +231,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.handleMouse(context.Background(), msg)
 		return m, m.takeCmd()
 	case tea.KeyMsg:
+		// A keystroke dismisses a finished drag-selection highlight (its rows may
+		// scroll/change), but never an in-progress drag.
+		if !m.selecting {
+			m.selActive = false
+		}
 		// Ctrl+C intentionally does NOT quit; the only way to exit is the ":q"
 		// command (see handleGlobalCommand).
 		// The unlock screen owns its keys: typing the password, plus a quit-only
@@ -197,6 +257,18 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.handleOverlayKey(msg) {
 			return m, m.takeCmd()
+		}
+		// Ctrl+K opens the AI assistant from any DB page (it's a control key, so it
+		// is safe to intercept even in the query editor's insert mode).
+		if msg.String() == "ctrl+k" && m.activeProfile != nil &&
+			(m.page == PageBrowser || m.page == PageData || m.page == PageQuery) {
+			m.openAIChatModal()
+			return m, m.takeCmd()
+		}
+		// While typing a `/` view-search query, keys feed the search, not the view.
+		if m.viewSearchInput {
+			m.handleViewSearchInputKey(msg.String(), msg.Runes)
+			return m, nil
 		}
 		if m.errBox != nil {
 			switch msg.String() {
@@ -232,6 +304,16 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.handleWorkspaceTabShortcut(msg) {
 			return m, nil
 		}
+		if m.page == PageGame && m.focus != FocusCommand {
+			if cmd, handled := m.handleGameKey(msg); handled {
+				return m, cmd
+			}
+		}
+		if m.connectionsPopupActive() && m.focus != FocusCommand {
+			if m.handleConnectionsKey(context.Background(), msg) {
+				return m, m.takeCmd()
+			}
+		}
 		if m.handleWorkspaceVimKey(context.Background(), msg) {
 			return m, m.takeCmd()
 		}
@@ -251,17 +333,27 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.back()
 		case "tab":
+			// Panel switching moved to Ctrl+H/Ctrl+L; Tab now only drives command
+			// suggestions (and the query-completion popup, handled in the vim layer).
 			if m.focus == FocusCommand {
 				if m.input.SuggestionsVisible() {
 					m.input.NextSuggestion()
 				} else {
 					m.openCommandSuggestions()
 				}
-			} else if !m.input.AcceptSuggestion() {
-				m.cycleFocus(1)
+			} else {
+				m.input.AcceptSuggestion()
 			}
 		case "shift+tab":
-			m.cycleFocus(-1)
+			if m.focus == FocusCommand && m.input.SuggestionsVisible() {
+				m.input.PreviousSuggestion()
+			}
+		case "ctrl+l":
+			// Focus the right (main / workspace) panel. Gated to non-text-entry so it
+			// never fires while typing a command or form field.
+			if !m.isTextEntryMode() {
+				m.focus = FocusMain
+			}
 		case "shift+left":
 			if m.navigationSidebarFocused() {
 				m.scrollNavigationHorizontal(-4)
@@ -336,7 +428,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			if !m.isTextEntryMode() && m.input.Value() == "" {
-				m.runPageAction(context.Background(), actionOpen)
+				// Keys follow the focused window: only act on the sidebar/list when
+				// it is focused (or on inherently-list pages). When the main panel is
+				// focused, the workspace already had its turn (handleWorkspaceVimKey);
+				// don't leak Enter into the sidebar (e.g. toggling a database).
+				if m.page == PageConnections || m.page == PageHistory || m.focus == FocusSidebar {
+					m.runPageAction(context.Background(), actionOpen)
+				}
 				return m, m.takeCmd()
 			}
 			m.HandleLine(context.Background(), m.input.Value())
@@ -344,12 +442,23 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.focus == FocusCommand {
 				m.restorePreviousFocus()
 			}
-		case "backspace", "ctrl+h":
-			if m.focus == FocusCommand && !m.navSearchActive && m.input.Value() == "" {
+		case "backspace", "ctrl+h", "alt+backspace":
+			// Ctrl+H focuses the left (sidebar) panel outside text entry; inside a
+			// text field Ctrl+H (= Ctrl+Backspace) and Alt+Backspace delete a word,
+			// while plain Backspace deletes a character.
+			if msg.String() == "ctrl+h" && !m.isTextEntryMode() {
+				m.focus = FocusSidebar
+				return m, nil
+			}
+			if msg.String() == "backspace" && m.focus == FocusCommand && !m.navSearchActive && m.input.Value() == "" {
 				m.exitCommandMode()
 				return m, nil
 			}
-			m.input.Backspace()
+			if msg.String() == "backspace" {
+				m.input.Backspace()
+			} else {
+				m.input.BackspaceWord()
+			}
 			m.syncNavigationSearchInput()
 			if m.helpOpen {
 				m.syncHelpSearch()
@@ -377,10 +486,31 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleRuneKey(ctx context.Context, key string) bool {
+	// vim gg/G jump to the first/last list item. Any non-"g" rune clears a pending
+	// leading "g".
+	prevG := m.navPendingG
+	if key != "g" {
+		m.navPendingG = false
+	}
 	switch key {
 	case "?":
 		m.openHelpPanel()
 		return true
+	case "g":
+		if !m.isTextEntryMode() {
+			if prevG {
+				m.navPendingG = false
+				m.moveSelection(-1 << 30)
+			} else {
+				m.navPendingG = true
+			}
+			return true
+		}
+	case "G":
+		if !m.isTextEntryMode() {
+			m.moveSelection(1 << 30)
+			return true
+		}
 	case "/":
 		if !m.isTextEntryMode() && (m.page == PageBrowser || m.page == PageData || m.page == PageQuery) && m.focus == FocusSidebar {
 			m.navSearchActive = true
@@ -473,7 +603,12 @@ func (m *Model) handleRuneKey(ctx context.Context, key string) bool {
 }
 
 func (m *Model) View() string {
-	return m.renderLayout()
+	frame := m.renderLayout()
+	m.lastFrameLines = strings.Split(frame, "\n") // clean copy for selection extraction
+	if m.selecting || m.selActive {
+		frame = m.applySelectionHighlight(frame)
+	}
+	return positionRealCursor(frame)
 }
 
 func (m *Model) legacyView() string {
@@ -574,6 +709,8 @@ func (m *Model) handleGlobalCommand(ctx context.Context, line string) bool {
 	switch command {
 	case "help", "?":
 		m.openHelpPanel()
+	case "ai":
+		m.handleAICommand(parts[1:])
 	case "new":
 		if len(parts) == 1 {
 			m.openConnectionForm()
@@ -732,11 +869,13 @@ func (m *Model) handleUnlockKey(msg tea.KeyMsg) (tea.Cmd, bool) {
 				m.exitUnlockCommand()
 				m.message = "locked: only :q is available before unlocking"
 			}
-		case "backspace", "ctrl+h":
+		case "backspace", "ctrl+h", "alt+backspace":
 			if m.input.Value() == "" {
 				m.exitUnlockCommand()
-			} else {
+			} else if msg.String() == "backspace" {
 				m.input.Backspace()
+			} else {
+				m.input.BackspaceWord()
 			}
 		default:
 			if len(msg.Runes) > 0 {
@@ -754,18 +893,75 @@ func (m *Model) handleUnlockKey(msg tea.KeyMsg) (tea.Cmd, bool) {
 		m.unlockCommand = true
 		m.message = "command (locked): only :q to quit, Esc to go back"
 	case "enter":
-		m.unlock(m.input.Value())
-		m.input.Clear()
-	case "backspace", "ctrl+h":
+		if m.firstRun() {
+			m.submitFirstRunPassword()
+		} else {
+			m.unlock(m.input.Value())
+			m.input.Clear()
+		}
+	case "backspace":
 		m.input.Backspace()
+	case "ctrl+h", "alt+backspace":
+		m.input.BackspaceWord()
 	case "esc":
-		// nothing to go back to before unlocking
+		// On the confirm step, Esc returns to the first password entry.
+		if m.unlockConfirm {
+			m.unlockConfirm = false
+			m.unlockFirstPassword = ""
+			m.input.Clear()
+			m.message = "set a master password"
+		}
 	default:
 		if len(msg.Runes) > 0 {
 			m.input.Insert(string(msg.Runes))
 		}
 	}
 	return nil, true
+}
+
+// firstRun reports whether no encrypted config exists yet, so the unlock screen
+// should set + confirm a new master password instead of unlocking.
+func (m *Model) firstRun() bool {
+	return m.store != nil && !m.store.Exists()
+}
+
+// submitFirstRunPassword drives the two-step first-run password setup: the first
+// Enter records the password, the second confirms it (or reports a mismatch).
+func (m *Model) submitFirstRunPassword() {
+	pw := m.input.Value()
+	if pw == "" {
+		m.message = "master password is required"
+		return
+	}
+	if !m.unlockConfirm {
+		m.unlockFirstPassword = pw
+		m.unlockConfirm = true
+		m.input.Clear()
+		m.message = "confirm the master password"
+		return
+	}
+	if pw != m.unlockFirstPassword {
+		m.unlockConfirm = false
+		m.unlockFirstPassword = ""
+		m.input.Clear()
+		m.message = "passwords do not match — set it again"
+		return
+	}
+	// Confirmed: persist an empty encrypted vault under the new master password.
+	master := m.unlockFirstPassword
+	m.unlockConfirm = false
+	m.unlockFirstPassword = ""
+	m.input.Clear()
+	m.vault = config.Vault{}
+	m.master = master
+	if err := m.store.Save(master, m.vault); err != nil {
+		m.master = ""
+		m.message = "could not save config: " + err.Error()
+		return
+	}
+	m.page = PageConnections
+	m.focus = FocusSidebar
+	m.message = "master password set"
 }
 
 func (m *Model) exitUnlockCommand() {
@@ -1228,41 +1424,91 @@ func (m *Model) refreshBrowser(context.Context) {
 	}
 	adapter := m.adapter
 	selectedDB := m.selectedDB
+	selectedCatalog := m.selectedCatalog
 	m.nextCmd = m.runAsync("Connecting…", func(ctx context.Context) tea.Msg {
-		databases, err := adapter.ListDatabases(ctx)
+		var catalogs []string
+		if provider, ok := adapter.(db.CatalogProvider); ok {
+			catalogs, _ = provider.ListCatalogs(ctx) // best-effort; empty => flat list
+		}
+		activeCatalog := ""
+		if len(catalogs) > 0 {
+			activeCatalog = selectedCatalog
+			if activeCatalog == "" || indexOfString(catalogs, activeCatalog) < 0 {
+				activeCatalog = defaultCatalog(catalogs)
+			}
+		}
+		databases, err := listDatabasesForCatalog(ctx, adapter, activeCatalog, len(catalogs) > 0)
 		loadDB := ""
 		var objects []db.Object
 		var objErr error
 		if err == nil && selectedDB != "" && indexOfString(databases, selectedDB) >= 0 {
 			loadDB = selectedDB
-			objects, objErr = adapter.ListObjects(ctx, db.Scope{Database: selectedDB})
+			objects, objErr = adapter.ListObjects(ctx, db.Scope{Catalog: normalizedCatalog(activeCatalog), Database: selectedDB})
 		}
 		return asyncResultMsg{apply: func(m *Model) {
-			m.applyRefreshBrowser(databases, err, loadDB, objects, objErr)
+			m.applyRefreshBrowser(catalogs, activeCatalog, databases, err, loadDB, objects, objErr)
 		}}
 	})
 }
 
-func (m *Model) applyRefreshBrowser(databases []string, err error, loadDB string, objects []db.Object, objErr error) {
+// defaultCatalog picks the catalog to open first: the built-in "internal" if
+// present, otherwise the first one returned.
+func defaultCatalog(catalogs []string) string {
+	for _, c := range catalogs {
+		if strings.EqualFold(c, "internal") {
+			return c
+		}
+	}
+	if len(catalogs) > 0 {
+		return catalogs[0]
+	}
+	return ""
+}
+
+// listDatabasesForCatalog lists databases for the active catalog (Doris) or the
+// flat database list (everything else / catalogs absent).
+func listDatabasesForCatalog(ctx context.Context, adapter db.Adapter, catalog string, hasCatalogs bool) ([]string, error) {
+	if hasCatalogs {
+		if provider, ok := adapter.(db.CatalogProvider); ok {
+			return provider.ListDatabasesInCatalog(ctx, catalog)
+		}
+	}
+	return adapter.ListDatabases(ctx)
+}
+
+func (m *Model) applyRefreshBrowser(catalogs []string, activeCatalog string, databases []string, err error, loadDB string, objects []db.Object, objErr error) {
 	if err != nil {
 		m.message = err.Error()
 		return
 	}
+	m.ensureNavigationState()
+	m.catalogs = catalogs
+	if len(catalogs) > 0 {
+		// activeCatalog defaults to the built-in "internal", whose databases are
+		// flattened to the top level; normalize so selection matches the flat
+		// nodes (which carry an empty catalog).
+		m.selectedCatalog = normalizedCatalog(activeCatalog)
+		m.catalogDatabases[activeCatalog] = databases
+		m.expandedCatalogs[activeCatalog] = true
+	} else {
+		m.selectedCatalog = ""
+	}
 	m.databases = databases
 	m.objects = nil
 	m.databaseIndex = 0
-	m.ensureNavigationState()
 	if loadDB != "" {
 		index := indexOfString(databases, loadDB)
 		m.databaseIndex = index
-		m.browserCursor = index
-		m.expandedDBs[loadDB] = true
+		if len(catalogs) == 0 {
+			m.browserCursor = index
+		}
+		key := m.scopeKey(activeCatalog, loadDB)
+		m.expandedDBs[key] = true
 		if objErr != nil {
 			m.message = objErr.Error()
 			return
 		}
-		m.ensureNavigationState()
-		m.databaseObjects[loadDB] = objects
+		m.databaseObjects[key] = objects
 		if m.selectedDB == loadDB {
 			m.objects = objects
 			m.objectIndex = 0
@@ -1281,7 +1527,7 @@ func (m *Model) loadObjects(ctx context.Context) {
 	if m.adapter == nil {
 		return
 	}
-	if err := m.loadObjectsForDatabase(ctx, m.selectedDB); err != nil {
+	if err := m.loadObjectsForDatabase(ctx, m.selectedCatalog, m.selectedDB); err != nil {
 		m.message = err.Error()
 		return
 	}
@@ -1290,7 +1536,11 @@ func (m *Model) loadObjects(ctx context.Context) {
 }
 
 func (m *Model) selectDatabase(ctx context.Context, index int) {
-	m.toggleDatabase(ctx, index)
+	if index < 0 || index >= len(m.databases) {
+		m.message = "no database available"
+		return
+	}
+	m.toggleDatabase(ctx, m.selectedCatalog, m.databases[index])
 }
 
 func (m *Model) openObject(ctx context.Context, name string) {
@@ -1301,7 +1551,7 @@ func (m *Model) openObject(ctx context.Context, name string) {
 	if m.activeDriver() == config.DriverRedis {
 		targetType = db.ObjectKey
 	}
-	target := db.Target{Database: m.selectedDB, Name: name, Type: targetType}
+	target := db.Target{Catalog: normalizedCatalog(m.selectedCatalog), Database: m.selectedDB, Name: name, Type: targetType}
 	if targetType == db.ObjectKey {
 		target.Database = ""
 	}

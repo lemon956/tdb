@@ -34,8 +34,7 @@ func TestMouseClickConnectionHitboxSelectsConnection(t *testing.T) {
 	model.openAdapter = func(config.Profile) (db.Adapter, error) { return &selectionAdapter{}, nil }
 	model.hitboxes = HitboxRegistry{{ID: "connection:1", X: 1, Y: 1, Width: 20, Height: 1, Focus: FocusSidebar, Index: 1}}
 
-	updated, _ := model.Update(tea.MouseMsg{X: 3, Y: 1, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
-	got := updated.(*Model)
+	got := leftClick(model, 3, 1).(*Model)
 	if got.page != PageConnections || got.connectionIndex != 1 {
 		t.Fatalf("page/index = %s/%d, want connections/1", got.page, got.connectionIndex)
 	}
@@ -48,9 +47,8 @@ func TestMouseDoubleClickConnectionHitboxOpensConnection(t *testing.T) {
 	model.openAdapter = func(config.Profile) (db.Adapter, error) { return &selectionAdapter{}, nil }
 	model.hitboxes = HitboxRegistry{{ID: "connection:0", X: 1, Y: 1, Width: 20, Height: 1, Focus: FocusSidebar, Index: 0}}
 
-	updated, _ := model.Update(tea.MouseMsg{X: 3, Y: 1, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
-	updated, _ = updated.Update(tea.MouseMsg{X: 3, Y: 1, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
-	got := updated.(*Model)
+	model = leftClick(model, 3, 1).(*Model)
+	got := leftClick(model, 3, 1).(*Model)
 	if got.page != PageBrowser || got.activeProfile.ID != "local" {
 		t.Fatalf("page/profile = %s/%+v, want browser/local", got.page, got.activeProfile)
 	}
@@ -75,19 +73,19 @@ func TestViewRegistersPanelAndListHitboxes(t *testing.T) {
 	model.height = 28
 	model.vault.Profiles = []config.Profile{{ID: "local", Driver: config.DriverRedis}}
 
-	_ = model.View()
+	view := model.View()
 
-	if _, ok := model.hitboxes.Hit(2, 3); !ok {
-		t.Fatalf("expected sidebar hitbox, got none: %+v", model.hitboxes)
+	// The connection row hitbox is registered at its rendered popup row and is
+	// clickable (no fixed action — single click selects, double click opens).
+	box, ok := findHitbox(model, "connection:0")
+	if !ok || box.Action != actionNone {
+		t.Fatalf("missing/!clickable connection hitbox: %+v", model.hitboxes)
 	}
-	foundConnection := false
-	for _, hit := range model.hitboxes {
-		if hit.ID == "connection:0" && hit.Action == actionNone {
-			foundConnection = true
-		}
+	if rowY := screenRowOf(view, "local"); rowY != box.Y {
+		t.Fatalf("connection:0 hitbox Y=%d but it renders at row %d", box.Y, rowY)
 	}
-	if !foundConnection {
-		t.Fatalf("missing connection hitbox: %+v", model.hitboxes)
+	if hit, ok := model.hitboxes.Hit(box.X+1, box.Y); !ok || hit.ID != "connection:0" {
+		t.Fatalf("click did not resolve to connection:0: %+v", hit)
 	}
 }
 
@@ -136,8 +134,7 @@ func TestMouseClickMongoDriverChoosesMongoForm(t *testing.T) {
 	model.form = newConnectionForm()
 	model.hitboxes = HitboxRegistry{{ID: "form-driver:mongo", X: 1, Y: 1, Width: 12, Height: 1, Focus: FocusContext, Payload: "mongo"}}
 
-	updated, _ := model.Update(tea.MouseMsg{X: 2, Y: 1, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
-	got := updated.(*Model)
+	got := leftClick(model, 2, 1).(*Model)
 	if got.form == nil || got.form.selectingDriver || got.form.driver != config.DriverMongo {
 		t.Fatalf("form = %+v, want chosen mongo", got.form)
 	}

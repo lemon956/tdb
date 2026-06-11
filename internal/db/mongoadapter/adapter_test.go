@@ -162,3 +162,42 @@ func TestExecuteEnforcesReadOnlyForWrites(t *testing.T) {
 		t.Fatalf("find on read-only conn must not be rejected as read-only")
 	}
 }
+
+func TestParseMongoshFilterObjectId(t *testing.T) {
+	hex := "6a26bfa9d8113edb1d85e82a"
+	shell, err := ParseMongoshCommand(`db.c.find({_id:ObjectId("` + hex + `")})`)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	id, ok := shell.Filter["_id"].(bson.ObjectID)
+	if !ok {
+		t.Fatalf("_id should parse to bson.ObjectID, got %T (%+v)", shell.Filter["_id"], shell.Filter["_id"])
+	}
+	if id.Hex() != hex {
+		t.Fatalf("ObjectID hex = %q, want %q", id.Hex(), hex)
+	}
+}
+
+func TestParseMongoshExtendedTypes(t *testing.T) {
+	for _, q := range []string{
+		`db.c.find({a:NumberLong(5)})`,
+		`db.c.find({a:NumberInt(3)})`,
+		`db.c.find({t:ISODate("2020-01-02T03:04:05Z")})`,
+		`db.c.find({x:1, y:"z"})`,
+		`db.c.find({})`,
+	} {
+		if _, err := ParseMongoshCommand(q); err != nil {
+			t.Fatalf("%s should parse, got %v", q, err)
+		}
+	}
+}
+
+func TestParseMongoshPlainFilterStillWorks(t *testing.T) {
+	shell, err := ParseMongoshCommand(`db.c.find({status:"active", n:1})`)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if shell.Filter["status"] != "active" {
+		t.Fatalf("status = %v, want active", shell.Filter["status"])
+	}
+}

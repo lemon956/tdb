@@ -45,11 +45,17 @@ type ObjectMetadata struct {
 }
 
 type Scope struct {
+	// Catalog is the Doris external catalog (empty or "internal" = the built-in
+	// catalog; other drivers leave it empty). It scopes Database below.
+	Catalog  string `json:"catalog,omitempty"`
 	Database string `json:"database"`
 	Schema   string `json:"schema,omitempty"`
 }
 
 type Target struct {
+	// Catalog is the Doris external catalog the object lives in (empty for the
+	// built-in/internal catalog and for non-Doris drivers).
+	Catalog  string     `json:"catalog,omitempty"`
 	Database string     `json:"database"`
 	Schema   string     `json:"schema,omitempty"`
 	Name     string     `json:"name"`
@@ -73,6 +79,7 @@ type Query struct {
 
 type Command struct {
 	Text     string `json:"text"`
+	Catalog  string `json:"catalog,omitempty"`
 	Database string `json:"database,omitempty"`
 }
 
@@ -97,6 +104,15 @@ type MetadataProvider interface {
 	Metadata(context.Context, Target) (ObjectMetadata, error)
 }
 
+// CatalogProvider is implemented by adapters that expose a catalog layer above
+// databases (Doris external catalogs). It is optional and discovered via type
+// assertion like MetadataProvider; ListCatalogs returning an empty slice means
+// "no catalog layer" and the UI falls back to the flat database list.
+type CatalogProvider interface {
+	ListCatalogs(context.Context) ([]string, error)
+	ListDatabasesInCatalog(context.Context, string) ([]string, error)
+}
+
 type Factory func(config.Profile) Adapter
 
 func NewPage(limit, offset int) Page {
@@ -114,6 +130,9 @@ func NewPage(limit, offset int) Page {
 
 func (t Target) String() string {
 	parts := []string{}
+	if t.Catalog != "" {
+		parts = append(parts, t.Catalog)
+	}
 	if t.Database != "" {
 		parts = append(parts, t.Database)
 	}

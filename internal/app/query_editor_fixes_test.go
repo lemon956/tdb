@@ -50,7 +50,7 @@ func TestSuggestionMetadataOnlyForKnownTables(t *testing.T) {
 	m.databaseObjects = map[string][]db.Object{"app": {{Name: "users", Type: db.ObjectTable}}}
 
 	// An unknown / partial table name must not trigger a metadata probe.
-	if fields := m.querySuggestionFields("app", "SELECT * FROM d"); fields != nil {
+	if fields := m.querySuggestionFields("", "app", "SELECT * FROM d"); fields != nil {
 		t.Fatalf("unknown table should yield no fields, got %+v", fields)
 	}
 	if stub.calls != 0 {
@@ -61,10 +61,10 @@ func TestSuggestionMetadataOnlyForKnownTables(t *testing.T) {
 	}
 
 	// A known table fetches once, then is served from cache.
-	if fields := m.querySuggestionFields("app", "SELECT * FROM users"); len(fields) != 1 {
+	if fields := m.querySuggestionFields("", "app", "SELECT * FROM users"); len(fields) != 1 {
 		t.Fatalf("known table should yield fields, got %+v", fields)
 	}
-	_ = m.querySuggestionFields("app", "SELECT * FROM users")
+	_ = m.querySuggestionFields("", "app", "SELECT * FROM users")
 	if stub.calls != 1 {
 		t.Fatalf("metadata should be fetched once and cached, calls=%d", stub.calls)
 	}

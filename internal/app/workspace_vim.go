@@ -13,6 +13,7 @@ import (
 	"tdb/internal/config"
 	"tdb/internal/db"
 	"tdb/internal/suggest"
+	"tdb/internal/validate"
 )
 
 // queryCursorLeft / queryCursorRight move the byte-offset cursor by one full
@@ -107,6 +108,18 @@ func (m *Model) handleQueryNormalKey(ctx context.Context, tab *workspaceTab, msg
 	case "i":
 		tab.VimMode = vimModeInsert
 		tab.WorkspaceFocus = workspaceFocusEditor
+	case "a":
+		tab.QueryCursor = queryCursorRight(tab.QueryBuffer, tab.QueryCursor)
+		tab.VimMode = vimModeInsert
+		tab.WorkspaceFocus = workspaceFocusEditor
+	case "A":
+		tab.QueryCursor = queryLineEndExclusive(tab.QueryBuffer, tab.QueryCursor)
+		tab.VimMode = vimModeInsert
+		tab.WorkspaceFocus = workspaceFocusEditor
+	case "I":
+		tab.QueryCursor = queryLineStart(tab.QueryBuffer, tab.QueryCursor)
+		tab.VimMode = vimModeInsert
+		tab.WorkspaceFocus = workspaceFocusEditor
 	case "v":
 		tab.VimMode = vimModeVisual
 		tab.SelectionAnchor = tab.QueryCursor
@@ -114,6 +127,14 @@ func (m *Model) handleQueryNormalKey(ctx context.Context, tab *workspaceTab, msg
 		tab.QueryCursor = queryNextWord(tab.QueryBuffer, tab.QueryCursor)
 	case "b":
 		tab.QueryCursor = queryPreviousWord(tab.QueryBuffer, tab.QueryCursor)
+	case "e":
+		tab.QueryCursor = queryEndOfWord(tab.QueryBuffer, tab.QueryCursor)
+	case "j", "down":
+		tab.QueryCursor = queryCursorDown(tab.QueryBuffer, tab.QueryCursor)
+	case "k", "up":
+		tab.QueryCursor = queryCursorUp(tab.QueryBuffer, tab.QueryCursor)
+	case "J":
+		m.joinQueryLine(tab)
 	case "0", "home":
 		tab.QueryCursor = queryLineStart(tab.QueryBuffer, tab.QueryCursor)
 	case "$", "end":
@@ -183,9 +204,18 @@ func (m *Model) handleQueryInsertKey(ctx context.Context, tab *workspaceTab, msg
 		tab.VimMode = vimModeNormal
 		tab.QueryHistoryIndex = -1
 		tab.QuerySuggestionsVisible = false
-	case "backspace", "ctrl+h":
+	case "backspace":
 		if tab.QueryCursor > 0 && len(tab.QueryBuffer) > 0 {
 			prev := queryCursorLeft(tab.QueryBuffer, tab.QueryCursor)
+			tab.QueryBuffer = tab.QueryBuffer[:prev] + tab.QueryBuffer[tab.QueryCursor:]
+			tab.QueryCursor = prev
+			tab.QueryHistoryIndex = -1
+			m.refreshQuerySuggestions(tab)
+		}
+	case "ctrl+h", "alt+backspace":
+		// Ctrl+Backspace (0x08 → "ctrl+h") and Alt+Backspace delete the previous word.
+		if tab.QueryCursor > 0 && len(tab.QueryBuffer) > 0 {
+			prev := queryPreviousWord(tab.QueryBuffer, tab.QueryCursor)
 			tab.QueryBuffer = tab.QueryBuffer[:prev] + tab.QueryBuffer[tab.QueryCursor:]
 			tab.QueryCursor = prev
 			tab.QueryHistoryIndex = -1
@@ -211,6 +241,18 @@ func (m *Model) handleQueryInsertKey(ctx context.Context, tab *workspaceTab, msg
 		insertQueryText(tab, "\n")
 		tab.QueryHistoryIndex = -1
 		tab.QuerySuggestionsVisible = false
+	case "tab":
+		// Tab scrolls the completion list (hands stay on home row); when no popup
+		// is showing it acts as "complete" by refreshing suggestions.
+		if tab.QuerySuggestionsVisible {
+			m.moveQuerySuggestion(tab, 1)
+		} else {
+			m.refreshQuerySuggestions(tab)
+		}
+	case "shift+tab":
+		if tab.QuerySuggestionsVisible {
+			m.moveQuerySuggestion(tab, -1)
+		}
 	case "up":
 		if tab.QuerySuggestionsVisible {
 			m.moveQuerySuggestion(tab, -1)
@@ -268,6 +310,24 @@ func (m *Model) handleQueryVisualKey(tab *workspaceTab, msg tea.KeyMsg) bool {
 		tab.QueryCursor = queryCursorLeft(tab.QueryBuffer, tab.QueryCursor)
 	case "l", "right":
 		tab.QueryCursor = queryCursorRight(tab.QueryBuffer, tab.QueryCursor)
+	case "j", "down":
+		tab.QueryCursor = queryCursorDown(tab.QueryBuffer, tab.QueryCursor)
+	case "k", "up":
+		tab.QueryCursor = queryCursorUp(tab.QueryBuffer, tab.QueryCursor)
+	case "w":
+		tab.QueryCursor = queryNextWord(tab.QueryBuffer, tab.QueryCursor)
+	case "b":
+		tab.QueryCursor = queryPreviousWord(tab.QueryBuffer, tab.QueryCursor)
+	case "e":
+		tab.QueryCursor = queryEndOfWord(tab.QueryBuffer, tab.QueryCursor)
+	case "0", "home":
+		tab.QueryCursor = queryLineStart(tab.QueryBuffer, tab.QueryCursor)
+	case "$", "end":
+		tab.QueryCursor = queryLineEnd(tab.QueryBuffer, tab.QueryCursor)
+	case "g":
+		tab.QueryCursor = 0
+	case "G":
+		tab.QueryCursor = max(0, len(tab.QueryBuffer)-1)
 	case "d":
 		start, end := querySelectionRange(tab)
 		if start <= end && start < len(tab.QueryBuffer) {
@@ -345,6 +405,12 @@ func (m *Model) handleDataNormalKey(tab *workspaceTab, msg tea.KeyMsg) bool {
 		m.pageData(1)
 	case "[":
 		m.pageData(-1)
+	case "/":
+		m.startDataViewSearch(tab)
+	case "n":
+		m.cycleViewSearch(1)
+	case "N":
+		m.cycleViewSearch(-1)
 	default:
 		return m.handleDataMotionKey(tab, msg.String())
 	}
@@ -712,6 +778,14 @@ func (m *Model) handleQueryResultKey(tab *workspaceTab, msg tea.KeyMsg) bool {
 	case "l", "right":
 		tab.ResultView.ScrollColumns(1, resultSetColumnCount(tab.Result))
 		m.syncActiveTabState()
+	case "/":
+		if selectable {
+			m.startQueryResultSearch(tab)
+		}
+	case "n":
+		m.cycleViewSearch(1)
+	case "N":
+		m.cycleViewSearch(-1)
 	default:
 		return false
 	}
@@ -943,6 +1017,49 @@ func queryPreviousWord(buffer string, cursor int) int {
 	return clamp(cursor, 0, len(buffer))
 }
 
+// queryCursorUp/Down move the cursor to the same byte-column on the adjacent
+// line (vim j/k), clamping the column to the target line's length.
+func queryCursorUp(buffer string, cursor int) int {
+	cursor = clamp(cursor, 0, len(buffer))
+	lineStart := queryLineStart(buffer, cursor)
+	if lineStart == 0 {
+		return cursor // already on the first line
+	}
+	col := cursor - lineStart
+	prevStart := queryLineStart(buffer, lineStart-1)
+	prevLen := lineStart - 1 - prevStart
+	return prevStart + min(col, prevLen)
+}
+
+func queryCursorDown(buffer string, cursor int) int {
+	cursor = clamp(cursor, 0, len(buffer))
+	lineStart := queryLineStart(buffer, cursor)
+	col := cursor - lineStart
+	nl := strings.IndexByte(buffer[cursor:], '\n')
+	if nl < 0 {
+		return cursor // already on the last line
+	}
+	nextStart := cursor + nl + 1
+	nextLen := len(buffer) - nextStart
+	if end := strings.IndexByte(buffer[nextStart:], '\n'); end >= 0 {
+		nextLen = end
+	}
+	return nextStart + min(col, nextLen)
+}
+
+// queryEndOfWord moves to the last byte of the current/next word (vim e).
+func queryEndOfWord(buffer string, cursor int) int {
+	cursor = clamp(cursor, 0, len(buffer))
+	cursor++ // always make progress past the current position
+	for cursor < len(buffer) && !isQueryWordByte(buffer[cursor]) {
+		cursor++
+	}
+	for cursor+1 < len(buffer) && isQueryWordByte(buffer[cursor+1]) {
+		cursor++
+	}
+	return clamp(cursor, 0, max(0, len(buffer)-1))
+}
+
 func queryLineStart(buffer string, cursor int) int {
 	cursor = clamp(cursor, 0, len(buffer))
 	idx := strings.LastIndex(buffer[:cursor], "\n")
@@ -950,6 +1067,34 @@ func queryLineStart(buffer string, cursor int) int {
 		return 0
 	}
 	return idx + 1
+}
+
+// queryLineEndExclusive returns the position just past the last character of the
+// cursor's line (the newline index, or len for the last line) — where vim A
+// appends.
+func queryLineEndExclusive(buffer string, cursor int) int {
+	cursor = clamp(cursor, 0, len(buffer))
+	idx := strings.IndexByte(buffer[cursor:], '\n')
+	if idx < 0 {
+		return len(buffer)
+	}
+	return cursor + idx
+}
+
+// joinQueryLine merges the current line with the next, replacing the newline and
+// the next line's leading whitespace with a single space (vim J).
+func (m *Model) joinQueryLine(tab *workspaceTab) {
+	buf := tab.QueryBuffer
+	lineStart := queryLineStart(buf, tab.QueryCursor)
+	nl := strings.IndexByte(buf[lineStart:], '\n')
+	if nl < 0 {
+		return // last line: nothing to join
+	}
+	nlIdx := lineStart + nl
+	pushQueryUndo(tab)
+	rest := strings.TrimLeft(buf[nlIdx+1:], " \t")
+	tab.QueryBuffer = buf[:nlIdx] + " " + rest
+	tab.QueryCursor = nlIdx
 }
 
 func queryLineEnd(buffer string, cursor int) int {
@@ -1014,6 +1159,7 @@ func (m *Model) refreshQuerySuggestions(tab *workspaceTab) {
 	if tab == nil {
 		return
 	}
+	m.updateQueryValidation(tab)
 	tab.QueryCursor = clamp(tab.QueryCursor, 0, len(tab.QueryBuffer))
 	// Only complete when nothing is glued to the right of the cursor: suppress
 	// when the next character is non-whitespace (i.e. the cursor sits in the
@@ -1027,7 +1173,13 @@ func (m *Model) refreshQuerySuggestions(tab *workspaceTab) {
 		}
 	}
 	input := tab.QueryBuffer[:tab.QueryCursor]
-	if strings.TrimSpace(input) == "" {
+	// Suppress within a fresh statement: nothing meaningful typed since the last
+	// ';' (so a bare ";" or "stmt; " never re-opens the popup).
+	segment := input
+	if i := strings.LastIndex(segment, ";"); i >= 0 {
+		segment = segment[i+1:]
+	}
+	if strings.TrimSpace(segment) == "" {
 		tab.QuerySuggestionsVisible = false
 		tab.QuerySuggestions = nil
 		tab.QuerySuggestionIdx = 0
@@ -1037,21 +1189,106 @@ func (m *Model) refreshQuerySuggestions(tab *workspaceTab) {
 	if database == "" {
 		database = m.selectedDB
 	}
-	fields := m.querySuggestionFields(database, input)
+	catalog := tab.QueryCatalog
+	if catalog == "" {
+		catalog = m.selectedCatalog
+	}
+	// Make sure the table list is available so FROM/JOIN can suggest table names
+	// (no-op after the first load for this database).
+	m.ensureQueryObjectsLoaded(catalog, database)
+	// Resolve the FROM table from the WHOLE current statement (both sides of the
+	// cursor), so e.g. `select | from users` can still offer users' columns.
+	stmt := currentStatement(tab.QueryBuffer, tab.QueryCursor)
+	fields := m.querySuggestionFields(catalog, database, stmt)
+	// For SQL drivers, lead with fields vs tables based on the clause, and qualify
+	// field suggestions with the FROM table (unless already typing "alias.col").
+	want := suggest.WantAny
+	table := ""
+	switch m.activeDriver() {
+	case config.DriverMySQL, config.DriverDoris:
+		want = sqlClauseWant(segment)
+		if !cursorAfterDot(input) {
+			table = sqlTableNameFromQuery(stmt)
+		}
+	}
 	tab.QuerySuggestions = suggest.Suggest(suggest.Context{
 		Page:    string(PageQuery),
 		Driver:  m.activeDriver(),
 		Input:   input,
-		Objects: m.querySuggestionObjects(database),
+		Objects: m.querySuggestionObjects(catalog, database),
 		Fields:  fields,
+		Want:    want,
+		Table:   table,
 	})
 	tab.QuerySuggestionIdx = 0
 	tab.QuerySuggestionsVisible = len(tab.QuerySuggestions) > 0
 }
 
-func (m *Model) querySuggestionObjects(database string) []string {
-	objects := m.databaseObjects[database]
-	if len(objects) == 0 && database == m.selectedDB {
+// updateQueryValidation runs the per-driver syntax/character checks and records
+// the first issue (if any) as a non-blocking warning shown above the result.
+func (m *Model) updateQueryValidation(tab *workspaceTab) {
+	if tab == nil {
+		return
+	}
+	issues := validate.Validate(m.activeDriver(), tab.QueryBuffer)
+	if len(issues) == 0 {
+		tab.QueryWarning = ""
+		return
+	}
+	tab.QueryWarning = issues[0].Message
+}
+
+// currentStatement returns the full statement containing the cursor (from the ';'
+// before it to the ';' after it, or the buffer ends) — both sides of the cursor —
+// so table resolution can see a FROM clause that follows the cursor.
+func currentStatement(buffer string, cursor int) string {
+	cursor = clamp(cursor, 0, len(buffer))
+	left := 0
+	if i := strings.LastIndex(buffer[:cursor], ";"); i >= 0 {
+		left = i + 1
+	}
+	right := len(buffer)
+	if i := strings.IndexByte(buffer[cursor:], ';'); i >= 0 {
+		right = cursor + i
+	}
+	return buffer[left:right]
+}
+
+// sqlClauseWant inspects the statement segment up to the cursor and returns the
+// completion category implied by the nearest clause keyword.
+func sqlClauseWant(segment string) suggest.Want {
+	normalized := strings.NewReplacer(",", " ", "(", " ", ")", " ", "\n", " ", "\t", " ").Replace(segment)
+	want := suggest.WantAny
+	for _, tok := range strings.Fields(normalized) {
+		switch strings.ToLower(tok) {
+		case "select", "where", "having", "on", "set", "by":
+			want = suggest.WantFields
+		case "from", "join", "into", "update", "table":
+			want = suggest.WantTables
+		}
+	}
+	return want
+}
+
+// cursorAfterDot reports whether the identifier under the cursor is preceded by a
+// '.', i.e. the user is typing "alias.column" and fields must not be re-qualified.
+func cursorAfterDot(input string) bool {
+	trimmed := strings.TrimRight(input, " \t\n")
+	i := len(trimmed)
+	for i > 0 {
+		c := trimmed[i-1]
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '$' {
+			i--
+			continue
+		}
+		break
+	}
+	return i > 0 && trimmed[i-1] == '.'
+}
+
+func (m *Model) querySuggestionObjects(catalog, database string) []string {
+	objects := m.databaseObjects[m.scopeKey(catalog, database)]
+	if len(objects) == 0 && database == m.selectedDB && catalog == m.selectedCatalog {
 		objects = m.objects
 	}
 	names := make([]string, 0, len(objects))
@@ -1065,12 +1302,12 @@ func (m *Model) querySuggestionObjects(database string) []string {
 
 // knownDatabaseObject reports whether name is a table/collection we have already
 // loaded for the database (case-insensitive).
-func (m *Model) knownDatabaseObject(database, name string) bool {
+func (m *Model) knownDatabaseObject(catalog, database, name string) bool {
 	name = strings.ToLower(strings.TrimSpace(name))
 	if name == "" {
 		return false
 	}
-	for _, object := range m.querySuggestionObjects(database) {
+	for _, object := range m.querySuggestionObjects(catalog, database) {
 		if strings.ToLower(object) == name {
 			return true
 		}
@@ -1078,18 +1315,18 @@ func (m *Model) knownDatabaseObject(database, name string) bool {
 	return false
 }
 
-func (m *Model) querySuggestionFields(database, input string) []suggest.Field {
-	target, ok := m.querySuggestionTarget(database, input)
+func (m *Model) querySuggestionFields(catalog, database, input string) []suggest.Field {
+	target, ok := m.querySuggestionTarget(catalog, database, input)
 	if !ok {
 		return nil
 	}
 	// Only fetch metadata for tables/collections we already know exist. This
 	// avoids probing partial identifiers while typing/deleting (e.g. "d") which
 	// would spam "Unknown table" errors and block the UI on every keystroke.
-	if !m.knownDatabaseObject(database, target.Name) {
+	if !m.knownDatabaseObject(catalog, database, target.Name) {
 		return nil
 	}
-	key := strings.Join([]string{string(m.activeDriver()), target.Database, target.Name}, "\x00")
+	key := strings.Join([]string{string(m.activeDriver()), target.Catalog, target.Database, target.Name}, "\x00")
 	if m.queryFieldCache == nil {
 		m.queryFieldCache = map[string][]suggest.Field{}
 	}
@@ -1119,20 +1356,21 @@ func (m *Model) querySuggestionFields(database, input string) []suggest.Field {
 	return fields
 }
 
-func (m *Model) querySuggestionTarget(database, input string) (db.Target, bool) {
+func (m *Model) querySuggestionTarget(catalog, database, input string) (db.Target, bool) {
+	cat := normalizedCatalog(catalog)
 	switch m.activeDriver() {
 	case config.DriverMongo:
 		collection := mongoCollectionNameFromQuery(input)
 		if collection == "" {
 			return db.Target{}, false
 		}
-		return db.Target{Database: database, Name: collection, Type: db.ObjectCollection}, true
+		return db.Target{Catalog: cat, Database: database, Name: collection, Type: db.ObjectCollection}, true
 	case config.DriverMySQL, config.DriverDoris:
 		table := sqlTableNameFromQuery(input)
 		if table == "" {
 			return db.Target{}, false
 		}
-		return db.Target{Database: database, Name: table, Type: db.ObjectTable}, true
+		return db.Target{Catalog: cat, Database: database, Name: table, Type: db.ObjectTable}, true
 	default:
 		return db.Target{}, false
 	}
