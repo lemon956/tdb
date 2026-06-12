@@ -13,6 +13,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"tdb/internal/aichat"
 	"tdb/internal/config"
 	"tdb/internal/db"
 	"tdb/internal/db/mongoadapter"
@@ -39,6 +40,7 @@ const (
 type Options struct {
 	ConfigPath      string
 	HistoryPath     string
+	AIChatPath      string
 	IconStyle       IconStyle
 	ClipboardWriter io.Writer
 	ClipboardCopier ClipboardCopier
@@ -129,10 +131,15 @@ type Model struct {
 	sessions      []connSession // one per open connection
 	activeSession int           // index into sessions, or -1 for the manager
 
-	aiSessions    map[string]*aiSession // AI chat history keyed by profileID + catalog/database
-	aiSchemaCache map[string]string     // table columns text, keyed by driver+catalog+db+table
-	aiSQLChoices  []string              // SQL blocks offered by the ctrl+y picker
-	modalRowHits  []Hitbox              // clickable rows of the active modal (e.g. db picker)
+	aiSessions    map[string]*aiSession         // AI conversations keyed by session ID
+	aiActive      map[string]string             // aiSessionKey() -> active session ID (per connection+database)
+	aiStore       *aichat.Store                 // persists conversations across restarts
+	aiLoaded      bool                          // sessions hydrated from aiStore yet?
+	aiListMode    aiListMode                    // inline sub-view inside the AI chat window
+	aiSuggestKind aiSuggestKind                 // whether the input dropdown lists commands or @tables
+	aiMetaCache   map[string]*db.ObjectMetadata // table metadata (cols/partition/key), keyed by driver+catalog+db+table
+	aiSQLChoices  []string                      // SQL blocks offered by the ctrl+y picker
+	modalRowHits  []Hitbox                      // clickable rows of the active modal (e.g. db picker)
 
 	// Mouse drag-selection (left-drag to select, auto-copy on release). Bounds are
 	// the column range of the panel the drag started in, so a selection never
@@ -179,6 +186,9 @@ func NewModel(options Options) *Model {
 	if options.HistoryPath == "" && options.ConfigPath != "" {
 		options.HistoryPath = options.ConfigPath + ".history.json"
 	}
+	if options.AIChatPath == "" && options.ConfigPath != "" {
+		options.AIChatPath = options.ConfigPath + ".aichat.json"
+	}
 	iconStyle := options.IconStyle
 	if iconStyle == "" {
 		iconStyle = ResolveIconStyle(IconDetectOptions{})
@@ -187,6 +197,7 @@ func NewModel(options Options) *Model {
 		options:       options,
 		store:         config.NewStore(options.ConfigPath),
 		history:       history.NewStore(options.HistoryPath),
+		aiStore:       aichat.NewStore(options.AIChatPath),
 		openAdapter:   OpenAdapter,
 		page:          PageUnlock,
 		input:         NewCommandInput(),
@@ -1844,6 +1855,13 @@ func defaultHistoryPath(configPath string) string {
 		return filepath.Join(".", "tdb.history.json")
 	}
 	return configPath + ".history.json"
+}
+
+func defaultAIChatPath(configPath string) string {
+	if configPath == "" {
+		return filepath.Join(".", "tdb.aichat.json")
+	}
+	return configPath + ".aichat.json"
 }
 
 func isMissingConnection(err error) bool {

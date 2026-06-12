@@ -39,6 +39,33 @@ func TestExtractSQLBlocks(t *testing.T) {
 	}
 }
 
+func TestExtractBlocksByLanguage(t *testing.T) {
+	// Mongo: a ```js fence is extracted when js is in the language list.
+	mongo := "Run:\n```js\ndb.users.find({active: true})\n```"
+	if got := ExtractBlocks(mongo, []string{"js", "javascript", "sql"}); len(got) != 1 || got[0] != "db.users.find({active: true})" {
+		t.Fatalf("```js block = %#v", got)
+	}
+	// Redis: a ```redis fence is extracted when redis is listed.
+	redis := "Try:\n```redis\nHGETALL user:1\n```"
+	if got := ExtractBlocks(redis, []string{"redis", "sh", "sql"}); len(got) != 1 || got[0] != "HGETALL user:1" {
+		t.Fatalf("```redis block = %#v", got)
+	}
+	// A ```js fence is NOT pulled when only sql is requested → falls through to
+	// the whole reply (no bare fence present here).
+	if got := ExtractBlocks(mongo, []string{"sql"}); len(got) != 1 || !strings.Contains(got[0], "```js") {
+		t.Fatalf("sql-only over ```js should fall back to whole reply, got %#v", got)
+	}
+	// First matching language wins; later ones are ignored.
+	mixed := "```redis\nGET k\n```\n```sql\nSELECT 1\n```"
+	if got := ExtractBlocks(mixed, []string{"sql", "redis"}); len(got) != 1 || got[0] != "SELECT 1" {
+		t.Fatalf("first listed language should win, got %#v", got)
+	}
+	// Bare fence fallback still works.
+	if got := ExtractBlocks("here:\n```\nGET k\n```", []string{"redis"}); len(got) != 1 || got[0] != "GET k" {
+		t.Fatalf("bare fence fallback = %#v", got)
+	}
+}
+
 func TestDetectPrefersPreferred(t *testing.T) {
 	look := func(name string) (string, error) {
 		switch name {

@@ -654,14 +654,14 @@ func metadataResult(metadata db.ObjectMetadata) result.Set {
 		if field.Nullable {
 			nullable = "YES"
 		}
-		rows = append(rows, result.Row{Values: []any{"field", field.Name, field.Type, nullable, field.Default}})
+		rows = append(rows, result.Row{Values: []any{"field", field.Name, field.Type, nullable, field.Default, field.Comment}})
 	}
 	for _, index := range metadata.Indexes {
 		unique := "NO"
 		if index.Unique {
 			unique = "YES"
 		}
-		rows = append(rows, result.Row{Values: []any{"index", index.Name, strings.Join(index.Columns, ","), unique, ""}})
+		rows = append(rows, result.Row{Values: []any{"index", index.Name, strings.Join(index.Columns, ","), unique, "", ""}})
 	}
 	if len(metadata.Attributes) > 0 {
 		keys := make([]string, 0, len(metadata.Attributes))
@@ -670,7 +670,7 @@ func metadataResult(metadata db.ObjectMetadata) result.Set {
 		}
 		sort.Strings(keys)
 		for _, key := range keys {
-			rows = append(rows, result.Row{Values: []any{"attribute", key, metadata.Attributes[key], "", ""}})
+			rows = append(rows, result.Row{Values: []any{"attribute", key, metadata.Attributes[key], "", "", ""}})
 		}
 	}
 	return result.Set{Table: &result.Table{
@@ -680,6 +680,7 @@ func metadataResult(metadata db.ObjectMetadata) result.Set {
 			{Name: "value"},
 			{Name: "flag"},
 			{Name: "default"},
+			{Name: "comment"},
 		},
 		Rows: rows,
 	}}

@@ -16,11 +16,12 @@ import (
 type metaStub struct {
 	calls  int
 	fields []db.MetadataField
+	attrs  map[string]string
 }
 
 func (a *metaStub) Metadata(context.Context, db.Target) (db.ObjectMetadata, error) {
 	a.calls++
-	return db.ObjectMetadata{Fields: a.fields}, nil
+	return db.ObjectMetadata{Fields: a.fields, Attributes: a.attrs}, nil
 }
 func (a *metaStub) Test(context.Context) error                                 { return nil }
 func (a *metaStub) ListDatabases(context.Context) ([]string, error)            { return nil, nil }

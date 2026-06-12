@@ -292,7 +292,55 @@ func metadataOn(ctx context.Context, runner sqlRunner, target db.Target) (db.Obj
 	if err != nil {
 		return db.ObjectMetadata{}, err
 	}
-	return db.ObjectMetadata{Fields: fields, Indexes: indexes}, nil
+	meta := db.ObjectMetadata{Fields: fields, Indexes: indexes}
+	// Best-effort: enrich tables with their partition/key columns (from the DDL)
+	// so the AI knows what to filter on and the metadata view can show them. A
+	// failure here (views, permissions, exotic engines) must not fail metadata.
+	if target.Type == db.ObjectTable {
+		if attrs := tableShapeAttributes(ctx, runner, target); len(attrs) > 0 {
+			meta.Attributes = attrs
+		}
+	}
+	return meta, nil
+}
+
+// tableShapeAttributes returns the partition and key clauses parsed from SHOW
+// CREATE TABLE, keyed "partition"/"key" for ObjectMetadata.Attributes. Returns
+// nil on any error or when the table has neither.
+func tableShapeAttributes(ctx context.Context, runner sqlRunner, target db.Target) map[string]string {
+	rows, err := runner.QueryContext(ctx, "SHOW CREATE TABLE "+qualifiedName(target))
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var ddl string
+	if rows.Next() {
+		values, err := scanRowMap(rows)
+		if err != nil {
+			return nil
+		}
+		for col, val := range values {
+			if strings.Contains(strings.ToLower(col), "create") {
+				ddl = val
+				break
+			}
+		}
+	}
+	if ddl == "" {
+		return nil
+	}
+	partition, key := parseCreateTableShape(ddl)
+	attrs := map[string]string{}
+	if partition != "" {
+		attrs["partition"] = partition
+	}
+	if key != "" {
+		attrs["key"] = key
+	}
+	if len(attrs) == 0 {
+		return nil
+	}
+	return attrs
 }
 
 func (a *Adapter) Insert(ctx context.Context, target db.Target, values map[string]any) (result.MutationResult, error) {
@@ -607,6 +655,7 @@ func metadataFields(ctx context.Context, runner sqlRunner, query string) ([]db.M
 			Type:     values["Type"],
 			Nullable: strings.EqualFold(values["Null"], "YES"),
 			Default:  values["Default"],
+			Comment:  values["Comment"],
 		})
 	}
 	return out, rows.Err()

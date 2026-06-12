@@ -54,6 +54,26 @@ func Detect(preferred string, look func(string) (string, error)) (*Provider, err
 	return nil, fmt.Errorf("no AI CLI found on PATH (looked for claude, codex)")
 }
 
+// Available returns the known providers found on PATH, in lookup order. look
+// defaults to exec.LookPath (injectable for tests).
+func Available(look func(string) (string, error)) []string {
+	if look == nil {
+		look = exec.LookPath
+	}
+	var out []string
+	for _, name := range knownProviders {
+		if bin, err := look(name); err == nil && bin != "" {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
+// KnownProviders lists every backend TDB can use, regardless of installation.
+func KnownProviders() []string {
+	return append([]string(nil), knownProviders...)
+}
+
 // argsFor builds the non-interactive (headless) invocation for each CLI.
 func (p *Provider) argsFor(prompt string) []string {
 	switch p.Name {
@@ -114,17 +134,27 @@ func ExtractSQL(reply string) string {
 // else bare ``` blocks). When there are no fences it falls back to the whole
 // trimmed reply as a single block.
 func ExtractSQLBlocks(reply string) []string {
-	blocks := allFencedBlocks(reply, "sql")
-	if len(blocks) == 0 {
-		blocks = allFencedBlocks(reply, "")
-	}
-	if len(blocks) == 0 {
-		if s := strings.TrimSpace(reply); s != "" {
-			return []string{s}
+	return ExtractBlocks(reply, []string{"sql"})
+}
+
+// ExtractBlocks returns every fenced code block matching the first language in
+// langs that appears in the reply, in order. This lets non-SQL drivers pull
+// their natural fences (```js for mongo, ```redis for redis) while SQL drivers
+// pass []string{"sql"}. When no listed language matches it falls back to bare
+// ``` blocks, then to the whole trimmed reply as a single block.
+func ExtractBlocks(reply string, langs []string) []string {
+	for _, lang := range langs {
+		if blocks := allFencedBlocks(reply, lang); len(blocks) > 0 {
+			return blocks
 		}
-		return nil
 	}
-	return blocks
+	if blocks := allFencedBlocks(reply, ""); len(blocks) > 0 {
+		return blocks
+	}
+	if s := strings.TrimSpace(reply); s != "" {
+		return []string{s}
+	}
+	return nil
 }
 
 // fencedBlock returns the body of the first ```<lang> ... ``` block. lang=="" matches a bare ``` fence.

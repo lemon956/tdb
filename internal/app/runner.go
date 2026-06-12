@@ -10,6 +10,9 @@ func Run(options Options) error {
 	if options.HistoryPath == "" {
 		options.HistoryPath = defaultHistoryPath(options.ConfigPath)
 	}
+	if options.AIChatPath == "" {
+		options.AIChatPath = defaultAIChatPath(options.ConfigPath)
+	}
 	if options.ClipboardWriter == nil {
 		options.ClipboardWriter = os.Stderr
 	}

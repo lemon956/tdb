@@ -30,6 +30,9 @@ type MetadataField struct {
 	Type     string `json:"type,omitempty"`
 	Nullable bool   `json:"nullable"`
 	Default  string `json:"default,omitempty"`
+	// Comment is the column comment (often documents enum-like values, e.g.
+	// "1=active 2=closed"); fed to the AI so it can use real domain values.
+	Comment string `json:"comment,omitempty"`
 }
 
 type MetadataIndex struct {
