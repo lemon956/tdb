@@ -56,7 +56,7 @@ func (v ResultView) Render(set result.Set) string {
 	if err != nil {
 		return fmt.Sprint(set.Value)
 	}
-	return string(raw) + "\n"
+	return highlightJSONText(string(raw), defaultTheme()) + "\n"
 }
 
 func (v ResultView) renderTable(table result.Table) string {
@@ -71,6 +71,14 @@ func (v ResultView) renderTable(table result.Table) string {
 	rowStart := clamp(v.RowOffset, 0, max(0, len(table.Rows)-1))
 	rowEnd := min(len(table.Rows), rowStart+height)
 	colStart := clamp(v.ColumnOffset, 0, max(0, len(table.Columns)-1))
+
+	// Reserve one column for a right-edge scrollbar when rows overflow (needs a
+	// width budget to anchor the gutter).
+	scrollable := len(table.Rows) > height && v.MaxWidth > 0
+	widthBudget := v.MaxWidth
+	if scrollable {
+		widthBudget = max(1, v.MaxWidth-1)
+	}
 
 	// Per-column display width from header + visible cells, capped so one wide
 	// value cannot dominate. When a pixel budget is known, also cap each column
@@ -102,7 +110,7 @@ func (v ResultView) renderTable(table result.Table) string {
 			if col > colStart {
 				add += sepWidth
 			}
-			if used+add > v.MaxWidth && col > colStart {
+			if used+add > widthBudget && col > colStart {
 				break
 			}
 			used += add
@@ -152,7 +160,26 @@ func (v ResultView) renderTable(table result.Table) string {
 	out := b.String()
 	if v.MaxWidth > 0 {
 		// Defensive clip so no styled line can exceed the budget and wrap.
-		out = truncateLines(out, v.MaxWidth)
+		out = truncateLines(out, widthBudget)
+	}
+	if scrollable {
+		// Attach a right-edge scrollbar: a continuous dim track on the header and
+		// status lines, a proportional bright thumb on the data rows.
+		bar := verticalScrollbar(height, len(table.Rows), height, rowStart)
+		track := theme.scrollbar.Render("│")
+		lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+		for i := range lines {
+			padded := padCellsANSI(lines[i], widthBudget)
+			switch {
+			case i == 0: // header
+				lines[i] = padded + track
+			case i-1 < rowEnd-rowStart: // data row
+				lines[i] = padded + barCell(bar, i-1)
+			default: // status line
+				lines[i] = padded + track
+			}
+		}
+		out = strings.Join(lines, "\n") + "\n"
 	}
 	return out
 }
@@ -171,7 +198,7 @@ func (v ResultView) renderDocuments(docs []result.Document) string {
 			b.WriteString(theme.muted.Render(strings.Repeat("─", 24)) + "\n")
 		}
 		raw, _ := json.MarshalIndent(docs[idx].Data, "", "  ")
-		b.WriteString(wrapMongoObjectIDs(string(raw)))
+		b.WriteString(highlightJSONText(wrapMongoObjectIDs(string(raw)), theme))
 		b.WriteString("\n")
 	}
 	if len(docs) > 0 {

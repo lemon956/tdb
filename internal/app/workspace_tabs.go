@@ -134,6 +134,7 @@ func (m *Model) openDataWorkspaceTab(target db.Target, set result.Set, mode work
 		m.selectedDB = target.Database
 	}
 	m.syncActiveTabState()
+	m.highlightSidebarForActiveTab()
 }
 
 func dataWorkspaceTabID(profileID string, target db.Target) string {
@@ -175,6 +176,7 @@ func (m *Model) openQueryWorkspaceTab() {
 	// table names after FROM/JOIN instead of falling back to functions/keywords.
 	m.ensureQueryObjectsLoaded(m.selectedCatalog, database)
 	m.syncActiveTabState()
+	m.highlightSidebarForActiveTab()
 }
 
 // ensureQueryObjectsLoaded fetches the object list for database if it has not been
@@ -200,6 +202,7 @@ func (m *Model) moveWorkspaceTab(delta int) {
 		m.activeTabIndex += len(m.workspaceTabs)
 	}
 	m.syncActiveTabState()
+	m.highlightSidebarForActiveTab()
 	m.message = "tab " + m.workspaceTabs[m.activeTabIndex].label(false)
 }
 
@@ -228,6 +231,7 @@ func (m *Model) closeActiveWorkspaceTab() {
 		return
 	}
 	m.syncActiveTabState()
+	m.highlightSidebarForActiveTab()
 	m.message = "closed " + closed
 }
 

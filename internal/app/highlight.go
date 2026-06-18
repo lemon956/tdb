@@ -23,6 +23,8 @@ const (
 	synCom
 	synVar
 	synPun
+	synKey  // JSON object key ("name":)
+	synBool // JSON true / false / null
 )
 
 func isIdentByte(b byte) bool {
@@ -252,6 +254,12 @@ func highlightRedis(text string, commands map[string]bool, cls []synClass) {
 
 // synStyle returns the style for a class and whether it should be applied.
 func (m *Model) synStyle(theme appTheme, c synClass) (lipgloss.Style, bool) {
+	return synStyleFor(theme, c)
+}
+
+// synStyleFor is the Model-free style lookup so renderers without a Model (e.g.
+// applyHighlight on JSON output) can colorize too.
+func synStyleFor(theme appTheme, c synClass) (lipgloss.Style, bool) {
 	switch c {
 	case synKw:
 		return theme.synKeyword, true
@@ -267,7 +275,98 @@ func (m *Model) synStyle(theme appTheme, c synClass) (lipgloss.Style, bool) {
 		return theme.synVariable, true
 	case synPun:
 		return theme.synPunct, true
+	case synKey:
+		return theme.synKey, true
+	case synBool:
+		return theme.synBool, true
 	default:
 		return lipgloss.Style{}, false
 	}
+}
+
+// highlightJSON classifies pretty-printed JSON (post wrapMongoObjectIDs) into
+// lexical spans: object keys vs string values, numbers, true/false/null, the
+// {}[],: punctuation, and mongo shell constructors like ObjectId("…") / ISODate(…)
+// (identifier immediately followed by "(") which render as functions.
+func highlightJSON(text string, cls []synClass) {
+	i := 0
+	for i < len(text) {
+		b := text[i]
+		switch {
+		case b == '"':
+			end := scanString(text, i)
+			if nextNonSpace(text, end) == ':' {
+				fill(cls, i, end, synKey)
+			} else {
+				fill(cls, i, end, synStr)
+			}
+			i = end
+		case b == '-' || (b >= '0' && b <= '9'):
+			start := i
+			if b == '-' {
+				i++
+			}
+			end := scanNumber(text, i)
+			if end <= start {
+				end = start + 1
+			}
+			fill(cls, start, end, synNum)
+			i = end
+		case isIdentStart(b):
+			j := i
+			for j < len(text) && isIdentByte(text[j]) {
+				j++
+			}
+			word := text[i:j]
+			switch {
+			case nextNonSpace(text, j) == '(':
+				fill(cls, i, j, synFn) // ObjectId( / ISODate( / NumberLong( …
+			case word == "true" || word == "false" || word == "null":
+				fill(cls, i, j, synBool)
+			}
+			i = j
+		case strings.IndexByte("{}[]():,", b) >= 0:
+			fill(cls, i, i+1, synPun)
+			i++
+		default:
+			i++
+		}
+	}
+}
+
+// jsonClasses tokenizes a whole JSON document into a per-byte class slice.
+func jsonClasses(text string) []synClass {
+	cls := make([]synClass, len(text))
+	highlightJSON(text, cls)
+	return cls
+}
+
+// applyHighlight composes text with its per-byte classes into an ANSI-styled
+// string. Consecutive bytes of the same class are coalesced into one Render call
+// — class boundaries always fall on rune boundaries (fill() colors whole tokens),
+// so each segment is valid UTF-8 and CJK is emitted whole. Coalescing keeps the
+// ANSI volume low for large JSON and avoids per-rune SGR resets. Colored tokens
+// never span a newline (JSON escapes them), so split-by-line stays self-contained.
+func applyHighlight(text string, classes []synClass, theme appTheme) string {
+	var b strings.Builder
+	for i := 0; i < len(text); {
+		c := classes[i]
+		j := i
+		for j < len(text) && classes[j] == c {
+			j++
+		}
+		seg := text[i:j]
+		if style, ok := synStyleFor(theme, c); ok {
+			b.WriteString(style.Render(seg))
+		} else {
+			b.WriteString(seg)
+		}
+		i = j
+	}
+	return b.String()
+}
+
+// highlightJSONText is the convenience one-shot: tokenize + colorize JSON.
+func highlightJSONText(text string, theme appTheme) string {
+	return applyHighlight(text, jsonClasses(text), theme)
 }

@@ -42,6 +42,12 @@ const cursorMarker = "​"
 // floating box's centering/scroll geometry. Stripped before display.
 const rowMarker = "‌"
 
+// boxMarker is a zero-width sentinel placed at the first and last line of an
+// overlay box's inner content (modalBox), so View can recover the box's interior
+// rectangle from the composed frame and clamp the drag selection to it — the
+// selection then never reaches the border. Stripped before display.
+const boxMarker = "⁠"
+
 // activeInputCursor is the cursor cell used at the one focused text-input surface
 // (AI panel, command line, search popups). It carries cursorMarker so View can
 // position the real terminal cursor at that column.

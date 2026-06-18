@@ -123,6 +123,28 @@ func (m *Model) isTextEntryMode() bool {
 	return m.page == PageUnlock || m.focus == FocusCommand || m.pending != nil || m.form != nil
 }
 
+// inTextInputContext reports whether the focused surface is consuming typed text
+// (command line, form, view-search, a text-entry modal, or the vim editor in
+// insert mode). In these contexts a coalesced multi-rune KeyMsg must stay intact
+// so a paste/fast-typing inserts all runes at once; elsewhere it is split so a
+// held navigation key repeats.
+func (m *Model) inTextInputContext() bool {
+	if m.isTextEntryMode() || m.viewSearchInput || m.helpOpen {
+		return true
+	}
+	if m.modal != nil {
+		switch m.modal.Kind {
+		case modalDatabasePicker, modalQueryHistorySearch, modalAIChat, modalHelp:
+			return true
+		}
+	}
+	if tab := m.activeWorkspaceTab(); tab != nil && tab.Kind == workspaceTabQuery &&
+		tab.WorkspaceFocus == workspaceFocusEditor && tab.VimMode == vimModeInsert {
+		return true
+	}
+	return false
+}
+
 func (m *Model) moveSelection(delta int) {
 	switch m.page {
 	case PageConnections:

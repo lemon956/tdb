@@ -39,7 +39,9 @@ func TestDataResultLinesWrapsObjectID(t *testing.T) {
 		{ID: "1", Data: map[string]any{"_id": "65d73f4a8178d088e95d4e9e", "n": 1}},
 	}}
 	lines := dataResultLines(set)
-	joined := strings.Join(lines, "\n")
+	// dataResultLines now syntax-highlights JSON, so compare against the
+	// ANSI-stripped visible text.
+	joined := stripANSI(strings.Join(lines, "\n"))
 	if !strings.Contains(joined, `ObjectId("65d73f4a8178d088e95d4e9e")`) {
 		t.Fatalf("document _id should render as ObjectId():\n%s", joined)
 	}

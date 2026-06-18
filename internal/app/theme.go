@@ -95,6 +95,8 @@ type appTheme struct {
 	synComment  lipgloss.Style
 	synVariable lipgloss.Style
 	synPunct    lipgloss.Style
+	synKey      lipgloss.Style // JSON object keys
+	synBool     lipgloss.Style // JSON true/false/null
 
 	// Centralized panel focus colors (formerly inline literals).
 	sidebarFocusBg, sidebarFocusEdge lipgloss.Color
@@ -199,6 +201,8 @@ func defaultTheme() appTheme {
 		synComment:  lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("#5F7488")),
 		synVariable: lipgloss.NewStyle().Foreground(lipgloss.Color("#FFCB6B")), // amber ($-ops)
 		synPunct:    lipgloss.NewStyle().Foreground(lipgloss.Color(colMuted)),
+		synKey:      lipgloss.NewStyle().Foreground(lipgloss.Color("#7FDBCA")), // cyan (JSON keys)
+		synBool:     lipgloss.NewStyle().Foreground(lipgloss.Color("#F78C6C")), // orange (true/false/null)
 
 		sidebarFocusBg:   lipgloss.Color(colSidebarFocusBg),
 		sidebarFocusEdge: lipgloss.Color(colSidebarFocusEdge),

@@ -70,6 +70,51 @@ func TestBuildSchemaContextIncludesFieldNotes(t *testing.T) {
 	}
 }
 
+// Multiple @tables in the same database all get their schema attached.
+func TestBuildSchemaContextMultipleTables(t *testing.T) {
+	m := newWorkspaceVimModel(t)
+	m.adapter = &metaStub{fields: []db.MetadataField{{Name: "id", Type: "bigint"}}}
+	m.selectedDB = "app"
+	m.databaseObjects = map[string][]db.Object{
+		m.scopeKey("", "app"): {
+			{Name: "orders", Type: db.ObjectTable},
+			{Name: "users", Type: db.ObjectTable},
+		},
+	}
+
+	ctx := m.buildSchemaContext("join @orders and @users")
+	if !strings.Contains(ctx, "Columns of orders") || !strings.Contains(ctx, "Columns of users") {
+		t.Fatalf("both same-database tables should be attached:\n%s", ctx)
+	}
+}
+
+// Accepting a second @table completion preserves the first mention in the input.
+func TestAcceptSecondMentionKeepsFirst(t *testing.T) {
+	m := newWorkspaceVimModel(t)
+	m.selectedDB = "app"
+	m.databaseObjects = map[string][]db.Object{
+		m.scopeKey("", "app"): {
+			{Name: "orders", Type: db.ObjectTable},
+			{Name: "users", Type: db.ObjectTable},
+		},
+	}
+	m.openAIChatModal()
+	// First mention.
+	for _, r := range "@orders" {
+		m.handleAIChatModalKey(keyMsg(string(r)))
+	}
+	m.acceptAIMention() // "@orders "
+	// Second mention.
+	for _, r := range "@us" {
+		m.handleAIChatModalKey(keyMsg(string(r)))
+	}
+	m.acceptAIMention()
+	got := m.input.Value()
+	if !strings.Contains(got, "@orders") || !strings.Contains(got, "@users") {
+		t.Fatalf("input should carry both mentions, got %q", got)
+	}
+}
+
 // A table with no commented columns adds no Field notes line.
 func TestBuildSchemaContextNoFieldNotes(t *testing.T) {
 	m := newWorkspaceVimModel(t)

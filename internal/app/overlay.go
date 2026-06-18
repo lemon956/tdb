@@ -42,7 +42,7 @@ func (m *Model) queryHistorySearchFloatingBox() string {
 	inner := clamp(avail-6, 30, 110)
 	theme := defaultTheme()
 	header := theme.accent.Render("Query history")
-	body := m.visibleModalBody(m.queryHistorySearchContent())
+	body := m.visibleModalBody(m.queryHistorySearchContent(), max(1, inner-2))
 	// Clip to inner minus the horizontal padding (1 each side) so lipgloss does
 	// not wrap long history statements onto a second line.
 	content := truncateLines(header+"\n"+body, max(1, inner-2))
@@ -61,7 +61,7 @@ func (m *Model) databasePickerFloatingBox() string {
 	inner := max(20, width-4)
 	theme := defaultTheme()
 	header := theme.accent.Render("Switch database")
-	body := m.visibleModalBody(m.databasePickerContent())
+	body := m.visibleModalBody(m.databasePickerContent(), max(1, inner-2))
 	content := truncateLines(header+"\n"+body, max(1, inner-2))
 	return lipgloss.NewStyle().
 		Width(inner).

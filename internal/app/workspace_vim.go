@@ -9,6 +9,7 @@ import (
 	"github.com/aymanbagabas/go-osc52/v2"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
 	"tdb/internal/config"
 	"tdb/internal/db"
@@ -599,7 +600,10 @@ func selectedDisplayText(lines []string, startRow, startCol, endRow, endCol int)
 		if from > to {
 			from, to = to, from
 		}
-		selected = append(selected, cellSlice(line, from, to-from+1))
+		// ANSI-aware slice (lines may carry JSON highlight color), then ansi.Strip so
+		// the copied text is plain. stripSelectionFrame defends against any
+		// box-drawing border at the edges (keep interior grid separators).
+		selected = append(selected, stripSelectionFrame(ansi.Strip(sliceColumns(line, from, to+1))))
 	}
 	return strings.Join(selected, "\n")
 }

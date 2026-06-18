@@ -13,6 +13,23 @@ import (
 	"tdb/internal/result"
 )
 
+// connectionsUIState owns the connections-manager screen's cursor/selection and
+// the detail popup. These are global UI state (not per-connection), so they live
+// outside connSession. Embedded in Model so m.connectionIndex / m.connectionsView
+// … keep working via field promotion.
+type connectionsUIState struct {
+	connectionIndex   int
+	connectionsView   ResultView // VisiData-style connections table: column/row scroll
+	connectionsDetail bool       // connection detail popup open (Ctrl+Enter)
+	connectionsAnchor int        // row-visual anchor for v/y copy
+	connectionsVisual bool       // row-visual ("copy mode") active in the table
+	// Detail popup (Field/Value table) cursor state — mirrors the mysql result page.
+	connectionsDetailIndex  int
+	connectionsDetailView   ResultView
+	connectionsDetailAnchor int
+	connectionsDetailVisual bool
+}
+
 // connectionColumns is the fixed column set for the VisiData-style connections
 // table — the single rule that maps every saved connection to one table row.
 var connectionColumns = []result.Column{

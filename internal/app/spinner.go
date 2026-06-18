@@ -56,30 +56,85 @@ func (m *Model) spinnerView() string {
 // only I/O and must not touch the model; the returned message is applied on the
 // main goroutine.
 func (m *Model) runAsync(label string, work func(context.Context) tea.Msg) tea.Cmd {
+	ctx, cancel := m.dbContext(context.Background())
+	return m.runAsyncContext(label, ctx, cancel)(work)
+}
+
+// runAIAsync runs a long, non-DB job (an agentic AI CLI that legitimately takes
+// minutes) under its OWN cancel slot (m.aiCancelOp), independent of the shared
+// m.cancelOp. This is critical: otherwise any concurrent DB operation's runAsync
+// would cancel the AI context and SIGKILL the CLI ("signal: killed"). timeout
+// <= 0 means no deadline (Esc-cancel only).
+func (m *Model) runAIAsync(label string, timeout time.Duration, work func(context.Context) tea.Msg) tea.Cmd {
+	if m.aiCancelOp != nil {
+		m.aiCancelOp()
+	}
+	var ctx context.Context
+	var cancel context.CancelFunc
+	if timeout <= 0 {
+		ctx, cancel = context.WithCancel(context.Background())
+	} else {
+		ctx, cancel = context.WithTimeout(context.Background(), timeout)
+	}
+	m.aiCancelOp = cancel
+	m.loading = loadingState{active: true, label: label}
+	return func() tea.Msg {
+		defer cancel()
+		return runWork(ctx, work)
+	}
+}
+
+// runWork executes a background work function under a recover boundary, so a
+// panic in off-thread I/O becomes an error box (applied on the main loop)
+// instead of crashing the Cmd goroutine and tearing down the program.
+func runWork(ctx context.Context, work func(context.Context) tea.Msg) (msg tea.Msg) {
+	defer func() {
+		if r := recover(); r != nil {
+			rec := r
+			msg = asyncResultMsg{apply: func(m *Model) {
+				m.logPanic("async", rec)
+				m.showErrorBox("后台任务崩溃", recoverToError(rec))
+			}}
+		}
+	}()
+	return work(ctx)
+}
+
+// runAsyncContext wires the spinner + Esc-cancel around a caller-built context,
+// returning a builder that takes the work function.
+func (m *Model) runAsyncContext(label string, ctx context.Context, cancel context.CancelFunc) func(func(context.Context) tea.Msg) tea.Cmd {
 	// Build the cancellable context on the main loop and stash its cancel func so a
 	// keypress can abort the in-flight operation (Esc).
 	if m.cancelOp != nil {
 		m.cancelOp()
 	}
-	ctx, cancel := m.dbContext(context.Background())
 	m.cancelOp = cancel
 	m.loading = loadingState{active: true, label: label}
 	// The spinner tick already runs continuously (started in Init), so we only
 	// return the I/O job. Bubble Tea runs it on a goroutine; tests can invoke it
 	// synchronously to apply the result.
-	return func() tea.Msg {
-		defer cancel()
-		return work(ctx)
+	return func(work func(context.Context) tea.Msg) tea.Cmd {
+		return func() tea.Msg {
+			defer cancel()
+			return runWork(ctx, work)
+		}
 	}
 }
 
-// cancelActiveOp aborts the in-flight async operation, if any.
+// cancelActiveOp aborts the in-flight async operation(s) — both the shared DB
+// slot and the independent AI slot — so Esc cancels whichever is running.
 func (m *Model) cancelActiveOp() bool {
-	if m.cancelOp == nil || !m.loading.active {
+	if m.cancelOp == nil && m.aiCancelOp == nil {
 		return false
 	}
-	m.cancelOp()
-	m.cancelOp = nil
+	if m.cancelOp != nil {
+		m.cancelOp()
+		m.cancelOp = nil
+	}
+	if m.aiCancelOp != nil {
+		m.aiCancelOp()
+		m.aiCancelOp = nil
+	}
 	m.loading = loadingState{}
 	m.message = "cancelled"
 	return true

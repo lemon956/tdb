@@ -177,12 +177,92 @@ func (a *Adapter) Metadata(ctx context.Context, target db.Target) (db.ObjectMeta
 		return db.ObjectMetadata{}, err
 	}
 	metadata := IndexDocumentsToMetadata(docs)
+	// MongoDB has no fixed schema, so derive field names by sampling documents.
+	// Best-effort: a sampling error just leaves Fields empty (indexes still return).
+	metadata.Fields = a.sampleFields(ctx, target.Database, target.Name)
 	if metadata.Attributes == nil {
 		metadata.Attributes = map[string]string{}
 	}
 	metadata.Attributes["database"] = target.Database
 	metadata.Attributes["collection"] = target.Name
 	return metadata, nil
+}
+
+// fieldSampleSize is how many documents Metadata samples to infer the field set.
+// fieldMaxCount/fieldMaxDepth bound the work for collections with sprawling or
+// deeply-nested documents.
+const (
+	fieldSampleSize = 50
+	fieldMaxCount   = 200
+	fieldMaxDepth   = 3
+)
+
+// sampleFields infers a collection's field names (including nested fields as
+// dotted paths, e.g. "addr.city") by scanning a sample of documents and taking
+// the union of their keys. Returns nil on any error — field suggestions are
+// best-effort and must never break the metadata probe.
+func (a *Adapter) sampleFields(ctx context.Context, database, collection string) []db.MetadataField {
+	cursor, err := a.client.Database(database).Collection(collection).Find(
+		ctx, bson.M{}, options.Find().SetLimit(fieldSampleSize),
+	)
+	if err != nil {
+		return nil
+	}
+	defer cursor.Close(ctx)
+
+	seen := map[string]struct{}{}
+	for cursor.Next(ctx) {
+		var doc bson.M
+		if err := cursor.Decode(&doc); err != nil {
+			return nil
+		}
+		collectFieldPaths(doc, "", 0, seen)
+		if len(seen) >= fieldMaxCount {
+			break
+		}
+	}
+	if err := cursor.Err(); err != nil {
+		return nil
+	}
+	paths := make([]string, 0, len(seen))
+	for path := range seen {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	fields := make([]db.MetadataField, 0, len(paths))
+	for _, path := range paths {
+		fields = append(fields, db.MetadataField{Name: path})
+	}
+	return fields
+}
+
+// collectFieldPaths records each field path of doc into seen, recursing into
+// nested documents (bson.M/bson.D) up to fieldMaxDepth and joining keys with
+// ".". Arrays are not expanded. prefix is the dotted path of doc's parent.
+func collectFieldPaths(doc bson.M, prefix string, depth int, seen map[string]struct{}) {
+	for key, value := range doc {
+		if len(seen) >= fieldMaxCount {
+			return
+		}
+		path := key
+		if prefix != "" {
+			path = prefix + "." + key
+		}
+		seen[path] = struct{}{}
+		if depth+1 >= fieldMaxDepth {
+			continue
+		}
+		switch nested := value.(type) {
+		case bson.M:
+			collectFieldPaths(nested, path, depth+1, seen)
+		case bson.D:
+			m := make(bson.M, len(nested))
+			for _, e := range nested {
+				m[e.Key] = e.Value
+			}
+			collectFieldPaths(m, path, depth+1, seen)
+		}
+	}
 }
 
 func (a *Adapter) Insert(ctx context.Context, target db.Target, values map[string]any) (result.MutationResult, error) {

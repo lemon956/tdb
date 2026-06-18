@@ -9,6 +9,19 @@ import (
 	"tdb/internal/result"
 )
 
+// viewSearchState owns the `/` search over the active grid/detail view. It is
+// embedded in Model so existing m.viewSearchQuery / m.viewSearchMatches … access
+// keeps working via field promotion.
+type viewSearchState struct {
+	viewSearchInput   bool
+	viewSearchQuery   string
+	viewSearchRows    []string
+	viewSearchMatches []int
+	viewSearchIndex   int
+	viewSearchOrigin  int
+	viewSearchMoveTo  func(int)
+}
+
 // View search adds a `/` incremental search (with n/N navigation) to the
 // read-only grid/detail views, which already have vim cursor movement + copy.
 // Each view passes its own searchable rows + a cursor-setter, so the same logic

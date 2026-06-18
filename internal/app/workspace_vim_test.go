@@ -685,10 +685,12 @@ func TestDataDocumentNormalCursorMovesByDisplayCharacter(t *testing.T) {
 		t.Fatalf("cursor = row:%d col:%d, want row:1 col:3 display character", tab.ResultRow, tab.ResultColumn)
 	}
 	lines := wrappedDataLines(dataResultLines(tab.Result), model.workspaceContentWidth())
-	wantCursor := defaultTheme().cursor.Render(cellSlice(lines[1], 3, 1))
+	// Lines are JSON-highlighted; the cursor renders over the ANSI-stripped cell.
+	wantChar := stripANSI(sliceColumns(lines[1], 3, 4))
+	wantCursor := defaultTheme().cursor.Render(wantChar)
 	content := model.workspaceDataContent(*tab)
 	if !strings.Contains(content, wantCursor) {
-		t.Fatalf("data viewport should render cursor on one display character %q:\n%q", cellSlice(lines[1], 3, 1), content)
+		t.Fatalf("data viewport should render cursor on one display character %q:\n%q", wantChar, content)
 	}
 	if strings.Contains(content, defaultTheme().cursor.Render(padCells(lines[1], model.workspaceContentWidth()))) {
 		t.Fatalf("data viewport should not render the whole row as cursor:\n%q", content)

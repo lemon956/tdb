@@ -102,6 +102,95 @@ func TestDragSelectionAutoCopies(t *testing.T) {
 	}
 }
 
+// A drag across a bordered overlay copies the content, not the box-drawing frame
+// or its centering whitespace — while keeping plain indentation and interior
+// separators.
+func TestStripSelectionFrame(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"   │ SELECT 1 │  ", "SELECT 1"},              // centered modal row
+		{"│ status — 1=active │", "status — 1=active"}, // tight border
+		{"  indented", "  indented"},                   // no border → keep indentation
+		{"a │ b", "a │ b"},                             // interior separator kept
+		{"plain text", "plain text"},                   // untouched
+		{"╭─────╮", ""},                                // a pure border row collapses to empty
+	}
+	for _, c := range cases {
+		if got := strings.TrimRight(stripSelectionFrame(c.in), " "); got != c.want {
+			t.Errorf("stripSelectionFrame(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+// extractSelectionText drops the modal border from a full-width drag.
+func TestExtractSelectionExcludesBorder(t *testing.T) {
+	m := newWorkspaceVimModel(t)
+	m.lastFrameLines = []string{"│ hello world │"}
+	m.selMinX, m.selMaxX = 0, 15
+	m.selAnchorX, m.selAnchorY = 0, 0
+	m.selX, m.selY = 14, 0
+	out := m.extractSelectionText()
+	if strings.ContainsRune(out, '│') {
+		t.Fatalf("copied selection must not contain the border: %q", out)
+	}
+	if !strings.Contains(out, "hello world") {
+		t.Fatalf("copied selection should keep the content: %q", out)
+	}
+}
+
+// detectOverlaySelRect recovers a box's inner rectangle from the boxMarker pair
+// and strips the markers.
+func TestDetectOverlaySelRect(t *testing.T) {
+	m := newWorkspaceVimModel(t)
+	m.overlayBoxWidth = 14
+	m.lastFrameLines = []string{
+		"      ╭─────────────╮",
+		"      │ " + boxMarker + "AI assistant │",
+		"      │ hello world │",
+		"      │ " + boxMarker + "second line  │",
+		"      ╰─────────────╯",
+	}
+	m.detectOverlaySelRect()
+	if m.overlaySel == nil {
+		t.Fatal("expected an overlay rect")
+	}
+	// "      │ " is 6 spaces + border + pad = display column 8.
+	if m.overlaySel.x != 8 || m.overlaySel.y != 1 || m.overlaySel.h != 3 || m.overlaySel.w != 14 {
+		t.Fatalf("rect = %+v, want {x:8 y:1 w:14 h:3}", *m.overlaySel)
+	}
+	for _, l := range m.lastFrameLines {
+		if strings.Contains(l, boxMarker) {
+			t.Fatalf("markers should be stripped: %q", l)
+		}
+	}
+}
+
+// A drag that starts and ends outside an overlay box is clamped to the box
+// interior, so the copy holds only content — no border, no outside text.
+func TestSelectionClampedToOverlayBox(t *testing.T) {
+	m := newWorkspaceVimModel(t)
+	m.overlaySel = &selRect{x: 8, y: 1, w: 14, h: 3}
+	m.lastFrameLines = []string{
+		"OUTSIDE TOP TEXT here",
+		"      │ AI assistant │",
+		"      │ hello world │",
+		"      │ second line  │",
+		"      ╰─────────────╯",
+	}
+	m.beginMouseDown(0, 0)      // clamps anchor into the box
+	m.updateMouseDrag(200, 200) // drag far past the box → clamped
+	out := m.extractSelectionText()
+
+	if strings.ContainsAny(out, "│╭╮╰╯─") {
+		t.Fatalf("clamped selection must not contain borders: %q", out)
+	}
+	if strings.Contains(out, "OUTSIDE") {
+		t.Fatalf("clamped selection must not reach outside the box: %q", out)
+	}
+	if !strings.Contains(out, "AI assistant") || !strings.Contains(out, "hello world") {
+		t.Fatalf("clamped selection should keep box content: %q", out)
+	}
+}
+
 type fakeClipboard struct{ text string }
 
 func (f *fakeClipboard) Copy(s string) error { f.text = s; return nil }

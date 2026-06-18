@@ -675,6 +675,88 @@ func TestNewAndHelpCommandsUseModal(t *testing.T) {
 	}
 }
 
+func TestHighlightSidebarFollowsActiveTabDatabase(t *testing.T) {
+	model := newWorkspaceTabModel(t)
+	model.databases = []string{"app", "analytics"}
+	model.ensureNavigationState()
+	// app is the initially-loaded/selected database (its objects sit in m.objects).
+	appObjects := []db.Object{{Name: "users", Type: db.ObjectCollection}}
+	analyticsObjects := []db.Object{{Name: "events", Type: db.ObjectCollection}}
+	model.databaseObjects[model.scopeKey("", "app")] = appObjects
+	model.databaseObjects[model.scopeKey("", "analytics")] = analyticsObjects
+	model.selectedDB = "app"
+	model.objects = appObjects
+	// Two query tabs on different databases; the active one drives the highlight.
+	model.workspaceTabs = []workspaceTab{
+		{ID: "query:1", Kind: workspaceTabQuery, QueryDatabase: "app"},
+		{ID: "query:2", Kind: workspaceTabQuery, QueryDatabase: "analytics"},
+	}
+	model.activeTabIndex = 1
+
+	model.highlightSidebarForActiveTab()
+
+	if model.selectedDB != "analytics" {
+		t.Fatalf("selectedDB = %q, want analytics", model.selectedDB)
+	}
+	node, ok := model.selectedBrowserNode()
+	if !ok || node.Kind != navNodeDatabase || node.Database != "analytics" {
+		t.Fatalf("cursor node = %+v (ok=%v), want analytics database node", node, ok)
+	}
+	// Regression: m.objects must follow selectedDB so a render (ensureNavigationState)
+	// does not bind app's objects onto analytics' key.
+	if len(model.objects) != 1 || model.objects[0].Name != "events" {
+		t.Fatalf("m.objects = %+v, want analytics objects after switch", model.objects)
+	}
+	// The followed database auto-expands so its collections/tables are revealed.
+	if !model.expandedDBs[model.scopeKey("", "analytics")] {
+		t.Fatalf("analytics should auto-expand when highlighted")
+	}
+	model.browserNodes() // triggers ensureNavigationState
+	if got := model.databaseObjects[model.scopeKey("", "analytics")]; len(got) != 1 || got[0].Name != "events" {
+		t.Fatalf("analytics objects = %+v, want unchanged events (not overwritten by app)", got)
+	}
+}
+
+func TestHighlightSidebarPrefersObjectNodeWhenExpanded(t *testing.T) {
+	model := newWorkspaceTabModel(t)
+	model.databases = []string{"app"}
+	model.ensureNavigationState()
+	// Expand "app" and load its collections so an object node exists to highlight.
+	key := model.scopeKey("", "app")
+	model.expandedDBs[key] = true
+	model.databaseObjects[key] = []db.Object{{Name: "users", Type: db.ObjectCollection}}
+	model.workspaceTabs = []workspaceTab{
+		{ID: "data", Kind: workspaceTabData, Target: db.Target{Database: "app", Name: "users", Type: db.ObjectCollection}},
+	}
+	model.activeTabIndex = 0
+
+	model.highlightSidebarForActiveTab()
+
+	node, ok := model.selectedBrowserNode()
+	if !ok || node.Kind != navNodeObject || node.Object.Name != "users" {
+		t.Fatalf("cursor node = %+v (ok=%v), want users object node", node, ok)
+	}
+}
+
+func TestRenderBrowserNodesDoesNotOverflowWithAmbiguousIcons(t *testing.T) {
+	model := newWorkspaceTabModel(t)
+	model.icons = IconSetForStyle(IconStyleUnicode) // ▦/◆/▾ etc. are ambiguous-width
+	nodes := []navNode{
+		{Kind: navNodeDatabase, Label: model.icons.Expanded + " " + model.icons.Database + " analytics", Depth: 0},
+		{Kind: navNodeObject, Label: model.icons.Table + " location_raw_data_history_v1", Depth: 1},
+		{Kind: navNodeObject, Label: model.icons.Table + " a", Depth: 1},
+	}
+	const width = 20
+	out := model.renderBrowserNodes(nodes, 0, width, len(nodes))
+	for _, line := range strings.Split(strings.TrimRight(out, "\n"), "\n") {
+		// renderBrowserNodes prepends a 2-cell cursor gutter; on a CJK terminal the
+		// row must still fit the pane, i.e. its ambiguous-aware width <= width+2.
+		if w := sidebarWidthCond.StringWidth(stripANSI(line)); w > width+2 {
+			t.Fatalf("row width %d exceeds budget %d (would wrap on CJK terminal): %q", w, width+2, line)
+		}
+	}
+}
+
 func newWorkspaceTabModel(t *testing.T) *Model {
 	t.Helper()
 	model := NewModel(Options{ConfigPath: filepath.Join(t.TempDir(), "tdb.enc"), IconStyle: IconStyleUnicode})

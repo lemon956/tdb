@@ -60,6 +60,38 @@ func TestIndexDocumentsToMetadata(t *testing.T) {
 	}
 }
 
+func TestCollectFieldPathsUnionsKeysAndNestsWithDots(t *testing.T) {
+	seen := map[string]struct{}{}
+	collectFieldPaths(bson.M{
+		"_id":  1,
+		"name": "ada",
+		"addr": bson.M{"city": "paris", "geo": bson.D{{Key: "lat", Value: 1}}},
+		"tags": []any{"a", "b"}, // arrays are not expanded
+	}, "", 0, seen)
+	// A second document contributes a field the first lacked (union, not intersection).
+	collectFieldPaths(bson.M{"email": "a@b.c"}, "", 0, seen)
+
+	for _, want := range []string{"_id", "name", "addr", "addr.city", "addr.geo", "addr.geo.lat", "tags", "email"} {
+		if _, ok := seen[want]; !ok {
+			t.Fatalf("missing field path %q in %v", want, seen)
+		}
+	}
+}
+
+func TestCollectFieldPathsRespectsMaxDepth(t *testing.T) {
+	seen := map[string]struct{}{}
+	collectFieldPaths(bson.M{
+		"a": bson.M{"b": bson.M{"c": bson.M{"d": 1}}},
+	}, "", 0, seen)
+	// fieldMaxDepth = 3, so "a", "a.b", "a.b.c" are recorded but "a.b.c.d" is not.
+	if _, ok := seen["a.b.c"]; !ok {
+		t.Fatalf("expected a.b.c, got %v", seen)
+	}
+	if _, ok := seen["a.b.c.d"]; ok {
+		t.Fatalf("a.b.c.d should be beyond fieldMaxDepth, got %v", seen)
+	}
+}
+
 func TestParseMongoshQueryMethods(t *testing.T) {
 	for _, tc := range []struct {
 		text       string

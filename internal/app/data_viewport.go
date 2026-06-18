@@ -7,9 +7,20 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
 	"tdb/internal/result"
 )
+
+// padCellsANSI right-pads an ANSI-styled string to width display cells (measuring
+// with ansi.StringWidth so embedded color codes don't count toward the width).
+func padCellsANSI(value string, width int) string {
+	current := ansi.StringWidth(value)
+	if current >= width {
+		return value
+	}
+	return value + strings.Repeat(" ", width-current)
+}
 
 // mongoObjectIDPattern matches an _id (or *_id reference) whose value is a 24-char
 // hex string, so mongo documents render the value as ObjectId("...") shell-style.
@@ -46,19 +57,33 @@ func (m *Model) renderDataTextViewport(tab workspaceTab, lines []string, width, 
 	}
 	offset = clamp(offset, 0, max(0, len(lines)-height))
 	end := min(len(lines), offset+height)
-	columnOffset := clamp(tab.ResultView.ColumnOffset, 0, max(0, maxDataDisplayLineWidth(lines)-width))
+	// Reserve one column for the scrollbar when the content overflows vertically.
+	scrollable := len(lines) > height
+	contentWidth := width
+	if scrollable {
+		contentWidth = max(1, width-1)
+	}
+	columnOffset := clamp(tab.ResultView.ColumnOffset, 0, max(0, maxDataDisplayLineWidth(lines)-contentWidth))
+	var bar []string
+	if scrollable {
+		bar = verticalScrollbar(height, len(lines), height, offset)
+	}
 	theme := defaultTheme()
 	startRow, startCol, endRow, endCol := orderedDataSelection(tab)
 	startRow = clamp(startRow, 0, len(lines)-1)
 	endRow = clamp(endRow, 0, len(lines)-1)
 	var b strings.Builder
 	for idx := offset; idx < end; idx++ {
-		line := padCells(cellSlice(lines[idx], columnOffset, width), width)
+		// ANSI-aware horizontal slice: lines may carry JSON highlight color codes.
+		line := padCellsANSI(sliceColumns(lines[idx], columnOffset, columnOffset+contentWidth), contentWidth)
 		switch {
 		case tab.VimMode == vimModeVisual && idx >= startRow && idx <= endRow:
-			line = renderDataVisualLine(line, width, idx, startRow, startCol-columnOffset, endRow, endCol-columnOffset, theme)
+			line = renderDataVisualLine(line, contentWidth, idx, startRow, startCol-columnOffset, endRow, endCol-columnOffset, theme)
 		case m.focus == FocusMain && idx == cursor:
-			line = renderDataCursorLine(line, width, tab.ResultColumn-columnOffset, theme)
+			line = renderDataCursorLine(line, contentWidth, tab.ResultColumn-columnOffset, theme)
+		}
+		if bar != nil {
+			line += barCell(bar, idx-offset)
 		}
 		b.WriteString(line + "\n")
 	}
@@ -66,7 +91,7 @@ func (m *Model) renderDataTextViewport(tab workspaceTab, lines []string, width, 
 }
 
 func renderDataVisualLine(line string, width, row, startRow, startCol, endRow, endCol int, theme appTheme) string {
-	line = padCells(line, width)
+	line = padCellsANSI(line, width)
 	visualStart := 0
 	visualEnd := max(0, lipgloss.Width(strings.TrimRight(line, " "))-1)
 	if row == startRow {
@@ -80,27 +105,32 @@ func renderDataVisualLine(line string, width, row, startRow, startCol, endRow, e
 	if visualStart > visualEnd {
 		visualStart, visualEnd = visualEnd, visualStart
 	}
-	selected := cellSlice(line, visualStart, visualEnd-visualStart+1)
+	selected := sliceColumns(line, visualStart, visualEnd+1)
 	if selected == "" {
 		selected = " "
 	}
 	selectedWidth := max(1, lipgloss.Width(selected))
-	prefix := cellSlice(line, 0, visualStart)
-	suffix := cellSlice(line, visualStart+selectedWidth, max(0, width-visualStart-selectedWidth))
-	return prefix + theme.visual.Render(selected) + suffix
+	prefix := sliceColumns(line, 0, visualStart)
+	suffix := sliceColumns(line, visualStart+selectedWidth, width)
+	// Strip the selected cell's own color so the visual highlight reverses cleanly
+	// (a nested SGR reset would otherwise cut the highlight short); prefix/suffix
+	// keep their JSON colors.
+	return prefix + theme.visual.Render(ansi.Strip(selected)) + suffix
 }
 
 func renderDataCursorLine(line string, width, column int, theme appTheme) string {
-	line = padCells(line, width)
+	line = padCellsANSI(line, width)
 	column = clamp(column, 0, max(0, width-1))
-	cell := cellSlice(line, column, 1)
+	cell := sliceColumns(line, column, column+1)
 	if cell == "" {
 		cell = " "
 	}
 	cellWidth := max(1, lipgloss.Width(cell))
-	prefix := cellSlice(line, 0, column)
-	suffix := cellSlice(line, column+cellWidth, max(0, width-column-cellWidth))
-	return prefix + theme.cursor.Render(cell) + suffix
+	prefix := sliceColumns(line, 0, column)
+	suffix := sliceColumns(line, column+cellWidth, width)
+	// Strip the cursor cell's own color so the cursor block renders cleanly over
+	// it; prefix/suffix keep their JSON colors.
+	return prefix + theme.cursor.Render(ansi.Strip(cell)) + suffix
 }
 
 func fitDataTableCell(value string, width int) string {
@@ -124,14 +154,44 @@ func dataDisplayLines(set result.Set, width int) []string {
 	return wrappedDataLines(dataResultLines(set), width)
 }
 
-// activeDataLines returns the display lines the grid cursor operates on: the
-// transposed single-row detail when the detail subpage is open, otherwise the
-// normal result lines.
+// activeDataLines returns the display lines the grid cursor operates on, memoized
+// because computing them (JSON marshal + highlight + wrap over ALL rows) is
+// expensive and is hit 5–6x per keystroke plus once per render. The key captures
+// everything the output depends on; a reloaded/ paged result gets a fresh backing
+// slice (new pointer) so the cache invalidates automatically.
 func (m *Model) activeDataLines(tab *workspaceTab, width int) []string {
+	key := dataLinesCacheKey(m.activeTabIndex, tab, width)
+	if key == m.dataLinesKey && m.dataLinesCache != nil {
+		return m.dataLinesCache
+	}
+	lines := computeActiveDataLines(tab, width)
+	m.dataLinesKey = key
+	m.dataLinesCache = lines
+	return lines
+}
+
+func computeActiveDataLines(tab *workspaceTab, width int) []string {
 	if tab.RowDetail && tab.Result.Table != nil {
 		return rowDetailLines(*tab.Result.Table, tab.ResultCursorRow)
 	}
 	return dataDisplayLines(tab.Result, width)
+}
+
+// dataLinesCacheKey fingerprints everything activeDataLines depends on. The
+// result content is identified by its backing-slice pointers + lengths (results
+// are immutable and replaced wholesale on load/paging, so a content change always
+// yields a new pointer). RowDetail + ResultCursorRow matter only for the
+// transposed single-row view but are cheap to always include.
+func dataLinesCacheKey(tabIndex int, tab *workspaceTab, width int) string {
+	rows := 0
+	if tab.Result.Table != nil {
+		rows = len(tab.Result.Table.Rows)
+	}
+	return fmt.Sprintf("%d|%d|%t|%d|%p/%d|%p/%d|%v",
+		tabIndex, width, tab.RowDetail, tab.ResultCursorRow,
+		tab.Result.Documents, len(tab.Result.Documents),
+		tab.Result.Table, rows,
+		tab.Result.Value)
 }
 
 // rowDetailLines transposes a single row into "FIELD  value" lines (one per
@@ -238,6 +298,7 @@ func maxDataDisplayLineWidth(lines []string) int {
 }
 
 func dataResultLines(set result.Set) []string {
+	theme := defaultTheme()
 	if len(set.Documents) > 0 {
 		lines := make([]string, 0, len(set.Documents)*8)
 		for _, doc := range set.Documents {
@@ -246,7 +307,11 @@ func dataResultLines(set result.Set) []string {
 				lines = append(lines, fmt.Sprint(doc.Data))
 				continue
 			}
-			lines = append(lines, splitContentLines(wrapMongoObjectIDs(string(raw)))...)
+			// Highlight AFTER wrapMongoObjectIDs so ObjectId(/ISODate( tokenize as
+			// constructors. The colorized lines stay ANSI-safe through the viewport
+			// because the data-grid slicing below is ANSI-aware (sliceColumns).
+			colored := highlightJSONText(wrapMongoObjectIDs(string(raw)), theme)
+			lines = append(lines, splitContentLines(colored)...)
 		}
 		return lines
 	}
@@ -254,7 +319,7 @@ func dataResultLines(set result.Set) []string {
 	if err != nil {
 		return splitContentLines(fmt.Sprint(set.Value))
 	}
-	return splitContentLines(string(raw))
+	return splitContentLines(highlightJSONText(string(raw), theme))
 }
 
 func splitContentLines(content string) []string {
@@ -274,10 +339,10 @@ func wrappedDataLines(lines []string, width int) []string {
 			wrapped = append(wrapped, line)
 			continue
 		}
+		// ANSI-aware wrap: lines may carry JSON highlight color codes.
 		for lipgloss.Width(line) > width {
-			part := cellSlice(line, 0, width)
-			wrapped = append(wrapped, part)
-			line = trimCellPrefix(line, lipgloss.Width(part))
+			wrapped = append(wrapped, sliceColumns(line, 0, width))
+			line = sliceColumns(line, width, lipgloss.Width(line))
 		}
 		if line != "" {
 			wrapped = append(wrapped, line)
@@ -290,7 +355,7 @@ func limitCells(line string, width int) string {
 	if lipgloss.Width(line) <= width {
 		return line
 	}
-	return cellSlice(line, 0, max(1, width-3)) + "..."
+	return sliceColumns(line, 0, max(1, width-3)) + "..."
 }
 
 func trimCellPrefix(value string, width int) string {

@@ -90,7 +90,9 @@ func TestResultViewRendersDocumentWindow(t *testing.T) {
 		{ID: "2", Data: map[string]any{"name": "Grace"}},
 	}}
 
-	got := view.Render(set)
+	// JSON documents are now syntax-highlighted, so assert on the ANSI-stripped
+	// text (the visible characters), not the raw colorized output.
+	got := stripANSI(view.Render(set))
 	if strings.Contains(got, "Ada") {
 		t.Fatalf("render included scrolled-out document:\n%s", got)
 	}

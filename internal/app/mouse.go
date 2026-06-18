@@ -58,19 +58,41 @@ func (m *Model) beginMouseDown(x, y int) {
 	m.selActive = false
 	m.selecting = false
 	m.mouseMoved = false
+	if r := m.overlaySel; r != nil {
+		// An overlay is open: confine the selection to its inner content rectangle
+		// so it can never reach (let alone copy) the box border.
+		m.selMinX, m.selMaxX = r.x, r.x+r.w
+		m.selMinY, m.selMaxY = r.y, r.y+r.h
+	} else {
+		sw := m.sidebarWidth()
+		if x < sw {
+			m.selMinX, m.selMaxX = 0, sw
+		} else {
+			m.selMinX, m.selMaxX = sw, max(sw+1, m.width)
+		}
+		m.selMinY, m.selMaxY = 0, len(m.lastFrameLines)
+	}
+	x, y = m.clampToSelBounds(x, y)
 	m.mouseDownX, m.mouseDownY = x, y
 	m.selAnchorX, m.selAnchorY = x, y
 	m.selX, m.selY = x, y
-	sw := m.sidebarWidth()
-	if x < sw {
-		m.selMinX, m.selMaxX = 0, sw
-	} else {
-		m.selMinX, m.selMaxX = sw, max(sw+1, m.width)
+}
+
+// clampToSelBounds confines a point to the active selection bounds (panel or
+// overlay box).
+func (m *Model) clampToSelBounds(x, y int) (int, int) {
+	if m.selMaxX > m.selMinX {
+		x = clamp(x, m.selMinX, m.selMaxX-1)
 	}
+	if m.selMaxY > m.selMinY {
+		y = clamp(y, m.selMinY, m.selMaxY-1)
+	}
+	return x, y
 }
 
 // updateMouseDrag extends the selection on left-button motion (a held drag).
 func (m *Model) updateMouseDrag(x, y int) {
+	x, y = m.clampToSelBounds(x, y)
 	m.selX, m.selY = x, y
 	if x != m.mouseDownX || y != m.mouseDownY {
 		m.mouseMoved = true
@@ -80,7 +102,7 @@ func (m *Model) updateMouseDrag(x, y int) {
 
 func (m *Model) endMouseDown(ctx context.Context, x, y int) {
 	if m.mouseMoved {
-		m.selX, m.selY = x, y
+		m.selX, m.selY = m.clampToSelBounds(x, y)
 		if text := m.extractSelectionText(); text != "" {
 			m.copyText(text)
 		}
@@ -175,6 +197,7 @@ func (m *Model) applyHitbox(ctx context.Context, hit Hitbox, x, y int) {
 			m.activeTabIndex = idx
 			m.focus = FocusMain
 			m.syncActiveTabState()
+			m.highlightSidebarForActiveTab()
 		}
 		return
 	}

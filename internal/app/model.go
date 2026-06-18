@@ -46,6 +46,15 @@ type Options struct {
 	ClipboardCopier ClipboardCopier
 }
 
+// unlockState owns the unlock / first-run screen's transient input state.
+// Embedded in Model so m.unlockCommand / m.unlockConfirm … keep working.
+type unlockState struct {
+	unlockCommand       bool   // unlock screen: typing a command (quit-only)
+	unlockPasswordDraft string // password preserved while in unlock command mode
+	unlockConfirm       bool   // first-run: entering the confirmation password
+	unlockFirstPassword string // first-run: the password awaiting confirmation
+}
+
 type Model struct {
 	options     Options
 	store       *config.Store
@@ -56,17 +65,11 @@ type Model struct {
 
 	page                 Page
 	input                CommandInput
-	unlockCommand        bool   // unlock screen: typing a command (quit-only)
-	unlockPasswordDraft  string // password preserved while in unlock command mode
-	unlockConfirm        bool   // first-run: entering the confirmation password
-	unlockFirstPassword  string // first-run: the password awaiting confirmation
-	navPendingG          bool   // a leading "g" was pressed in a list (awaiting "gg")
+	unlockState               // unlock / first-run screen input (see unlockState)
+	navPendingG          bool // a leading "g" was pressed in a list (awaiting "gg")
 	message              string
 	lastCopiedText       string
 	form                 *connectionForm
-	helpOpen             bool
-	errBox               *errorBox
-	modal                *modalState
 	lastClickID          string
 	lastClickAt          time.Time
 	width                int
@@ -75,96 +78,78 @@ type Model struct {
 	resizingSidebar      bool
 	focus                Focus
 	previousFocus        Focus
-	modalPreviousFocus   Focus
 	hitboxes             HitboxRegistry
 	icons                IconSet
 
-	activeProfile     *config.Profile
-	adapter           db.Adapter
-	catalogs          []string            // Doris external catalogs; empty = no catalog layer
-	expandedCatalogs  map[string]bool     // which catalogs show their databases
-	catalogDatabases  map[string][]string // catalog -> its database names (lazy)
-	selectedCatalog   string              // catalog the active database belongs to
-	databases         []string
-	objects           []db.Object
-	databaseObjects   map[string][]db.Object // keyed by scopeKey(catalog, database)
-	expandedDBs       map[string]bool        // keyed by scopeKey(catalog, database)
-	expandedMeta      map[string]bool
-	selectedDB        string
-	connectionIndex   int
-	connectionsView   ResultView // VisiData-style connections table: column/row scroll
-	connectionsDetail bool       // connection detail popup open (Ctrl+Enter)
-	connectionsAnchor int        // row-visual anchor for v/y copy
-	connectionsVisual bool       // row-visual ("copy mode") active in the table
-	// Detail popup (Field/Value table) cursor state — mirrors the mysql result page.
-	connectionsDetailIndex  int
-	connectionsDetailView   ResultView
-	connectionsDetailAnchor int
-	connectionsDetailVisual bool
-	databaseIndex           int
-	objectIndex             int
-	browserCursor           int
-	navVerticalOffset       int
-	navHorizontalOffset     int
-	navSearchActive         bool
-	navSearchQuery          string
-	navSearchMatchIndex     int
-	target                  db.Target
-	result                  result.Set
-	resultView              ResultView
-	workspaceMode           workspaceMode
-	workspaceTabs           []workspaceTab
-	activeTabIndex          int
-	nextQueryTabID          int
-	queryFieldCache         map[string][]suggest.Field
-	helpSearch              string
-	redisCursor             uint64
-	redisPattern            string
-	historyIndex            int
-	queryTimeout            time.Duration      // 0 = no timeout (Esc to cancel)
-	cancelOp                context.CancelFunc // cancels the in-flight async op
-	cursorBlinkOn           bool
-	pending                 *pendingAction
-	loading                 loadingState
-	nextCmd                 tea.Cmd
+	// Floating overlays (see overlayState in overlays.go): modal, errBox, help,
+	// pending confirmation. Embedded for field promotion.
+	overlayState
+
+	activeProfile    *config.Profile
+	adapter          db.Adapter
+	catalogs         []string            // Doris external catalogs; empty = no catalog layer
+	expandedCatalogs map[string]bool     // which catalogs show their databases
+	catalogDatabases map[string][]string // catalog -> its database names (lazy)
+	selectedCatalog  string              // catalog the active database belongs to
+	databases        []string
+	objects          []db.Object
+	databaseObjects  map[string][]db.Object // keyed by scopeKey(catalog, database)
+	expandedDBs      map[string]bool        // keyed by scopeKey(catalog, database)
+	expandedMeta     map[string]bool
+	selectedDB       string
+	// Connections-manager UI (see connectionsUIState in connections_view.go).
+	connectionsUIState
+	databaseIndex       int
+	objectIndex         int
+	browserCursor       int
+	navVerticalOffset   int
+	navHorizontalOffset int
+	navSearchActive     bool
+	navSearchQuery      string
+	navSearchMatchIndex int
+	target              db.Target
+	result              result.Set
+	resultView          ResultView
+	workspaceMode       workspaceMode
+	workspaceTabs       []workspaceTab
+	activeTabIndex      int
+	nextQueryTabID      int
+	queryFieldCache     map[string][]suggest.Field
+	redisCursor         uint64
+	redisPattern        string
+	historyIndex        int
+	queryTimeout        time.Duration      // 0 = no timeout (Esc to cancel)
+	cancelOp            context.CancelFunc // cancels the in-flight DB async op
+	aiCancelOp          context.CancelFunc // cancels the in-flight AI call (independent slot)
+	cursorBlinkOn       bool
+	loading             loadingState
+	nextCmd             tea.Cmd
+
+	// A1: set when View() itself panicked; the next Update turns it into an
+	// errorBox (View must not mutate errBox during render).
+	renderPanicked bool
+	renderPanicMsg string
+
+	// Memo for activeDataLines: the data grid's display lines (JSON marshal +
+	// highlight + wrap over ALL rows) are expensive and were recomputed 5–6x per
+	// keystroke plus every render. Cached here, keyed by tab/width/result identity.
+	dataLinesKey   string
+	dataLinesCache []string
 
 	sessions      []connSession // one per open connection
 	activeSession int           // index into sessions, or -1 for the manager
 
-	aiSessions    map[string]*aiSession         // AI conversations keyed by session ID
-	aiActive      map[string]string             // aiSessionKey() -> active session ID (per connection+database)
-	aiStore       *aichat.Store                 // persists conversations across restarts
-	aiLoaded      bool                          // sessions hydrated from aiStore yet?
-	aiListMode    aiListMode                    // inline sub-view inside the AI chat window
-	aiSuggestKind aiSuggestKind                 // whether the input dropdown lists commands or @tables
-	aiMetaCache   map[string]*db.ObjectMetadata // table metadata (cols/partition/key), keyed by driver+catalog+db+table
-	aiSQLChoices  []string                      // SQL blocks offered by the ctrl+y picker
-	modalRowHits  []Hitbox                      // clickable rows of the active modal (e.g. db picker)
+	// AI assistant state (see aiPanelState in ai_panel.go). Embedded for field
+	// promotion (m.aiSessions, m.aiStore, …).
+	aiPanelState
 
-	// Mouse drag-selection (left-drag to select, auto-copy on release). Bounds are
-	// the column range of the panel the drag started in, so a selection never
-	// bleeds into the other panel's columns.
-	selecting      bool
-	selActive      bool // a finished selection is still highlighted (until next press)
-	selAnchorX     int
-	selAnchorY     int
-	selX           int
-	selY           int
-	selMinX        int
-	selMaxX        int
-	mouseDownX     int
-	mouseDownY     int
-	mouseMoved     bool
-	lastFrameLines []string // last rendered frame (clean), for selection extraction
+	// Mouse drag-selection state (see selectionState in selection.go). Embedded so
+	// m.selecting / m.selX / m.lastFrameLines … keep working via field promotion.
+	selectionState
 
-	// `/` search over the active grid/detail view.
-	viewSearchInput   bool
-	viewSearchQuery   string
-	viewSearchRows    []string
-	viewSearchMatches []int
-	viewSearchIndex   int
-	viewSearchOrigin  int
-	viewSearchMoveTo  func(int)
+	// `/` search over the active grid/detail view (see viewSearchState in
+	// view_search.go). Embedded for field promotion.
+	viewSearchState
 
 	game dinoGame // fallback dino-runner state (PageGame)
 }
@@ -197,7 +182,7 @@ func NewModel(options Options) *Model {
 		options:       options,
 		store:         config.NewStore(options.ConfigPath),
 		history:       history.NewStore(options.HistoryPath),
-		aiStore:       aichat.NewStore(options.AIChatPath),
+		aiPanelState:  aiPanelState{aiStore: aichat.NewStore(options.AIChatPath)},
 		openAdapter:   OpenAdapter,
 		page:          PageUnlock,
 		input:         NewCommandInput(),
@@ -214,7 +199,30 @@ func (m *Model) Init() tea.Cmd {
 	return tea.Batch(cursorBlinkCmd(), spinnerTickCmd())
 }
 
-func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+// Update is the recover boundary around the real handler: a panic anywhere in
+// the update tree (including asyncResultMsg.apply) becomes an error box instead
+// of crashing the whole program (Bubble Tea would otherwise exit on panic).
+func (m *Model) Update(msg tea.Msg) (model tea.Model, cmd tea.Cmd) {
+	defer func() {
+		if r := recover(); r != nil {
+			m.logPanic("Update", r)
+			m.finishLoading()
+			m.showErrorBox("内部错误", recoverToError(r))
+			model, cmd = m, nil
+		}
+	}()
+	// A previous View() panic is surfaced here, where mutating errBox is safe.
+	if m.renderPanicked {
+		m.renderPanicked = false
+		msg := m.renderPanicMsg
+		m.renderPanicMsg = ""
+		m.showErrorBox("渲染错误", fmt.Errorf("%s", msg))
+		return m, nil
+	}
+	return m.updateImpl(msg)
+}
+
+func (m *Model) updateImpl(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case blinkMsg:
 		m.cursorBlinkOn = !m.cursorBlinkOn
@@ -242,255 +250,279 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.handleMouse(context.Background(), msg)
 		return m, m.takeCmd()
 	case tea.KeyMsg:
-		// A keystroke dismisses a finished drag-selection highlight (its rows may
-		// scroll/change), but never an in-progress drag.
-		if !m.selecting {
-			m.selActive = false
-		}
-		// Ctrl+C intentionally does NOT quit; the only way to exit is the ":q"
-		// command (see handleGlobalCommand).
-		// The unlock screen owns its keys: typing the password, plus a quit-only
-		// command sub-mode invoked with ":".
-		if m.page == PageUnlock {
-			if cmd, handled := m.handleUnlockKey(msg); handled {
-				return m, cmd
+		return m.dispatchKeyMsg(msg)
+	}
+	return m, m.takeCmd()
+}
+
+// dispatchKeyMsg splits coalesced key-repeat into individual runes outside text
+// input, so a held navigation key (Bubble Tea delivers a held key as one KeyMsg
+// with Runes=[...]) moves repeatedly instead of falling through to the
+// "unsupported shortcut" fallback. Text-input contexts keep the whole batch so a
+// paste / fast typing inserts every rune at once.
+func (m *Model) dispatchKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if msg.Type == tea.KeyRunes && len(msg.Runes) > 1 && !m.inTextInputContext() {
+		var cmd tea.Cmd
+		for _, r := range msg.Runes {
+			if _, c := m.routeKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}}); c != nil {
+				cmd = c
 			}
 		}
-		// While an async DB op runs, Esc aborts it (only the ":q" command quits).
-		if m.loading.active && msg.String() == "esc" {
-			if m.cancelActiveOp() {
-				return m, nil
-			}
+		return m, cmd
+	}
+	return m.routeKeyMsg(msg)
+}
+
+// routeKeyMsg dispatches a single key event (the body formerly inline in Update).
+func (m *Model) routeKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// A keystroke dismisses a finished drag-selection highlight (its rows may
+	// scroll/change), but never an in-progress drag.
+	if !m.selecting {
+		m.selActive = false
+	}
+	// Ctrl+C intentionally does NOT quit; the only way to exit is the ":q"
+	// command (see handleGlobalCommand).
+	// The unlock screen owns its keys: typing the password, plus a quit-only
+	// command sub-mode invoked with ":".
+	if m.page == PageUnlock {
+		if cmd, handled := m.handleUnlockKey(msg); handled {
+			return m, cmd
 		}
-		// Connection-tab switching (Alt+arrows / Alt+digits) works from anywhere.
-		if m.handleConnectionTabKey(msg) {
-			return m, m.takeCmd()
-		}
-		if m.handleOverlayKey(msg) {
-			return m, m.takeCmd()
-		}
-		// Ctrl+K opens the AI assistant from any DB page (it's a control key, so it
-		// is safe to intercept even in the query editor's insert mode).
-		if msg.String() == "ctrl+k" && m.activeProfile != nil &&
-			(m.page == PageBrowser || m.page == PageData || m.page == PageQuery) {
-			m.openAIChatModal()
-			return m, m.takeCmd()
-		}
-		// While typing a `/` view-search query, keys feed the search, not the view.
-		if m.viewSearchInput {
-			m.handleViewSearchInputKey(msg.String(), msg.Runes)
+	}
+	// While an async DB op runs, Esc aborts it (only the ":q" command quits).
+	if m.loading.active && msg.String() == "esc" {
+		if m.cancelActiveOp() {
 			return m, nil
 		}
-		if m.errBox != nil {
-			switch msg.String() {
-			case "esc", "enter":
-				m.closeErrorBox()
-				return m, nil
-			}
-		}
-		if m.helpOpen {
-			switch msg.String() {
-			case "esc", "enter":
-				m.closeHelpPanel()
-				return m, nil
-			}
-		}
-		if m.form != nil {
-			m.handleConnectionFormKey(context.Background(), msg)
-			return m, nil
-		}
-		if m.modal != nil && m.modal.Kind == modalHistory {
-			switch msg.String() {
-			case "esc", "enter":
-				m.closeModal()
-				return m, nil
-			case "up", "k":
-				m.moveHistorySelection(-1)
-				return m, nil
-			case "down", "j":
-				m.moveHistorySelection(1)
-				return m, nil
-			}
-		}
-		if m.handleWorkspaceTabShortcut(msg) {
-			return m, nil
-		}
-		if m.page == PageGame && m.focus != FocusCommand {
-			if cmd, handled := m.handleGameKey(msg); handled {
-				return m, cmd
-			}
-		}
-		if m.connectionsPopupActive() && m.focus != FocusCommand {
-			if m.handleConnectionsKey(context.Background(), msg) {
-				return m, m.takeCmd()
-			}
-		}
-		if m.handleWorkspaceVimKey(context.Background(), msg) {
-			return m, m.takeCmd()
-		}
+	}
+	// Connection-tab switching (Alt+arrows / Alt+digits) works from anywhere.
+	if m.handleConnectionTabKey(msg) {
+		return m, m.takeCmd()
+	}
+	if m.handleOverlayKey(msg) {
+		return m, m.takeCmd()
+	}
+	// Ctrl+K opens the AI assistant from any DB page (it's a control key, so it
+	// is safe to intercept even in the query editor's insert mode).
+	if msg.String() == "ctrl+k" && m.activeProfile != nil &&
+		(m.page == PageBrowser || m.page == PageData || m.page == PageQuery) {
+		m.openAIChatModal()
+		return m, m.takeCmd()
+	}
+	// While typing a `/` view-search query, keys feed the search, not the view.
+	if m.viewSearchInput {
+		m.handleViewSearchInputKey(msg.String(), msg.Runes)
+		return m, nil
+	}
+	if m.errBox != nil {
 		switch msg.String() {
-		case "esc":
-			if m.focus == FocusCommand && !m.navSearchActive {
-				m.exitCommandMode()
-				return m, nil
-			}
-			if m.input.SuggestionsVisible() {
-				m.input.HideSuggestions()
-				return m, nil
-			}
-			if m.navSearchActive {
-				m.clearNavigationSearch()
-				return m, nil
-			}
-			m.back()
-		case "tab":
-			// Panel switching moved to Ctrl+H/Ctrl+L; Tab now only drives command
-			// suggestions (and the query-completion popup, handled in the vim layer).
-			if m.focus == FocusCommand {
-				if m.input.SuggestionsVisible() {
-					m.input.NextSuggestion()
-				} else {
-					m.openCommandSuggestions()
-				}
-			} else {
-				m.input.AcceptSuggestion()
-			}
-		case "shift+tab":
-			if m.focus == FocusCommand && m.input.SuggestionsVisible() {
-				m.input.PreviousSuggestion()
-			}
-		case "ctrl+l":
-			// Focus the right (main / workspace) panel. Gated to non-text-entry so it
-			// never fires while typing a command or form field.
-			if !m.isTextEntryMode() {
-				m.focus = FocusMain
-			}
-		case "shift+left":
-			if m.navigationSidebarFocused() {
-				m.scrollNavigationHorizontal(-4)
-			}
-		case "shift+right":
-			if m.navigationSidebarFocused() {
-				m.scrollNavigationHorizontal(4)
-			}
-		case "ctrl+space":
-			m.input.ToggleSuggestions(m.suggestions())
-		case "up":
-			if m.input.SuggestionsVisible() {
-				m.input.PreviousSuggestion()
-			} else if m.focus == FocusMain && m.activeWorkspaceResultAvailable() {
-				m.scrollActiveWorkspaceRows(-1)
-			} else if m.page == PageConnections || m.page == PageBrowser || m.page == PageData || m.page == PageQuery || m.page == PageHistory {
-				m.moveSelection(-1)
-			}
-		case "down":
+		case "esc", "enter":
+			m.closeErrorBox()
+			return m, nil
+		}
+	}
+	if m.helpOpen {
+		switch msg.String() {
+		case "esc", "enter":
+			m.closeHelpPanel()
+			return m, nil
+		}
+	}
+	if m.form != nil {
+		m.handleConnectionFormKey(context.Background(), msg)
+		return m, nil
+	}
+	if m.modal != nil && m.modal.Kind == modalHistory {
+		switch msg.String() {
+		case "esc", "enter":
+			m.closeModal()
+			return m, nil
+		case "up", "k":
+			m.moveHistorySelection(-1)
+			return m, nil
+		case "down", "j":
+			m.moveHistorySelection(1)
+			return m, nil
+		}
+	}
+	if m.handleWorkspaceTabShortcut(msg) {
+		return m, nil
+	}
+	if m.page == PageGame && m.focus != FocusCommand {
+		if cmd, handled := m.handleGameKey(msg); handled {
+			return m, cmd
+		}
+	}
+	if m.connectionsPopupActive() && m.focus != FocusCommand {
+		if m.handleConnectionsKey(context.Background(), msg) {
+			return m, m.takeCmd()
+		}
+	}
+	if m.handleWorkspaceVimKey(context.Background(), msg) {
+		return m, m.takeCmd()
+	}
+	switch msg.String() {
+	case "esc":
+		if m.focus == FocusCommand && !m.navSearchActive {
+			m.exitCommandMode()
+			return m, nil
+		}
+		if m.input.SuggestionsVisible() {
+			m.input.HideSuggestions()
+			return m, nil
+		}
+		if m.navSearchActive {
+			m.clearNavigationSearch()
+			return m, nil
+		}
+		m.back()
+	case "tab":
+		// Panel switching moved to Ctrl+H/Ctrl+L; Tab now only drives command
+		// suggestions (and the query-completion popup, handled in the vim layer).
+		if m.focus == FocusCommand {
 			if m.input.SuggestionsVisible() {
 				m.input.NextSuggestion()
-			} else if m.focus == FocusMain && m.activeWorkspaceResultAvailable() {
-				m.scrollActiveWorkspaceRows(1)
-			} else if m.page == PageConnections || m.page == PageBrowser || m.page == PageData || m.page == PageQuery || m.page == PageHistory {
-				m.moveSelection(1)
-			}
-		case "left":
-			if m.focus == FocusMain && m.activeWorkspaceResultAvailable() {
-				m.scrollActiveWorkspaceColumns(-1)
-			} else if m.page == PageData {
-				m.resultView.ScrollColumns(-1, m.resultColumnCount())
-				m.syncActiveTabFromModel()
-			} else if !m.isTextEntryMode() {
-				m.movePanelFocus(-1)
-			}
-		case "right":
-			if m.focus == FocusMain && m.activeWorkspaceResultAvailable() {
-				m.scrollActiveWorkspaceColumns(1)
-			} else if m.page == PageData {
-				m.resultView.ScrollColumns(1, m.resultColumnCount())
-				m.syncActiveTabFromModel()
-			} else if !m.isTextEntryMode() {
-				m.movePanelFocus(1)
-			}
-		case "pgup":
-			if m.focus == FocusMain && m.activeWorkspaceResultAvailable() {
-				m.scrollActiveWorkspaceRows(-10)
-			} else if m.page == PageData {
-				m.resultView.ScrollRows(-10, m.resultRowCount())
-				m.syncActiveTabFromModel()
-			}
-		case "pgdown":
-			if m.focus == FocusMain && m.activeWorkspaceResultAvailable() {
-				m.scrollActiveWorkspaceRows(10)
-			} else if m.page == PageData {
-				m.resultView.ScrollRows(10, m.resultRowCount())
-				m.syncActiveTabFromModel()
-			}
-		case "enter":
-			if m.focus == FocusCommand && m.input.SuggestionsVisible() {
-				m.input.AcceptSuggestion()
-				return m, nil
-			}
-			if m.navSearchActive {
-				m.syncNavigationSearchInput()
-				m.jumpNavigationSearch(false)
-				m.focus = FocusSidebar
-				return m, nil
-			}
-			if m.page == PageHistory && m.input.Value() == "" {
-				m.refillSelectedHistory()
-				return m, nil
-			}
-			if !m.isTextEntryMode() && m.input.Value() == "" {
-				// Keys follow the focused window: only act on the sidebar/list when
-				// it is focused (or on inherently-list pages). When the main panel is
-				// focused, the workspace already had its turn (handleWorkspaceVimKey);
-				// don't leak Enter into the sidebar (e.g. toggling a database).
-				if m.page == PageConnections || m.page == PageHistory || m.focus == FocusSidebar {
-					m.runPageAction(context.Background(), actionOpen)
-				}
-				return m, m.takeCmd()
-			}
-			m.HandleLine(context.Background(), m.input.Value())
-			m.input.Clear()
-			if m.focus == FocusCommand {
-				m.restorePreviousFocus()
-			}
-		case "backspace", "ctrl+h", "alt+backspace":
-			// Ctrl+H focuses the left (sidebar) panel outside text entry; inside a
-			// text field Ctrl+H (= Ctrl+Backspace) and Alt+Backspace delete a word,
-			// while plain Backspace deletes a character.
-			if msg.String() == "ctrl+h" && !m.isTextEntryMode() {
-				m.focus = FocusSidebar
-				return m, nil
-			}
-			if msg.String() == "backspace" && m.focus == FocusCommand && !m.navSearchActive && m.input.Value() == "" {
-				m.exitCommandMode()
-				return m, nil
-			}
-			if msg.String() == "backspace" {
-				m.input.Backspace()
 			} else {
-				m.input.BackspaceWord()
+				m.openCommandSuggestions()
 			}
+		} else {
+			m.input.AcceptSuggestion()
+		}
+	case "shift+tab":
+		if m.focus == FocusCommand && m.input.SuggestionsVisible() {
+			m.input.PreviousSuggestion()
+		}
+	case "ctrl+l":
+		// Focus the right (main / workspace) panel. Gated to non-text-entry so it
+		// never fires while typing a command or form field.
+		if !m.isTextEntryMode() {
+			m.focus = FocusMain
+		}
+	case "shift+left":
+		if m.navigationSidebarFocused() {
+			m.scrollNavigationHorizontal(-4)
+		}
+	case "shift+right":
+		if m.navigationSidebarFocused() {
+			m.scrollNavigationHorizontal(4)
+		}
+	case "ctrl+space":
+		m.input.ToggleSuggestions(m.suggestions())
+	case "up":
+		if m.input.SuggestionsVisible() {
+			m.input.PreviousSuggestion()
+		} else if m.focus == FocusMain && m.activeWorkspaceResultAvailable() {
+			m.scrollActiveWorkspaceRows(-1)
+		} else if m.page == PageConnections || m.page == PageBrowser || m.page == PageData || m.page == PageQuery || m.page == PageHistory {
+			m.moveSelection(-1)
+		}
+	case "down":
+		if m.input.SuggestionsVisible() {
+			m.input.NextSuggestion()
+		} else if m.focus == FocusMain && m.activeWorkspaceResultAvailable() {
+			m.scrollActiveWorkspaceRows(1)
+		} else if m.page == PageConnections || m.page == PageBrowser || m.page == PageData || m.page == PageQuery || m.page == PageHistory {
+			m.moveSelection(1)
+		}
+	case "left":
+		if m.focus == FocusMain && m.activeWorkspaceResultAvailable() {
+			m.scrollActiveWorkspaceColumns(-1)
+		} else if m.page == PageData {
+			m.resultView.ScrollColumns(-1, m.resultColumnCount())
+			m.syncActiveTabFromModel()
+		} else if !m.isTextEntryMode() {
+			m.movePanelFocus(-1)
+		}
+	case "right":
+		if m.focus == FocusMain && m.activeWorkspaceResultAvailable() {
+			m.scrollActiveWorkspaceColumns(1)
+		} else if m.page == PageData {
+			m.resultView.ScrollColumns(1, m.resultColumnCount())
+			m.syncActiveTabFromModel()
+		} else if !m.isTextEntryMode() {
+			m.movePanelFocus(1)
+		}
+	case "pgup":
+		if m.focus == FocusMain && m.activeWorkspaceResultAvailable() {
+			m.scrollActiveWorkspaceRows(-10)
+		} else if m.page == PageData {
+			m.resultView.ScrollRows(-10, m.resultRowCount())
+			m.syncActiveTabFromModel()
+		}
+	case "pgdown":
+		if m.focus == FocusMain && m.activeWorkspaceResultAvailable() {
+			m.scrollActiveWorkspaceRows(10)
+		} else if m.page == PageData {
+			m.resultView.ScrollRows(10, m.resultRowCount())
+			m.syncActiveTabFromModel()
+		}
+	case "enter":
+		if m.focus == FocusCommand && m.input.SuggestionsVisible() {
+			m.input.AcceptSuggestion()
+			return m, nil
+		}
+		if m.navSearchActive {
+			m.syncNavigationSearchInput()
+			m.jumpNavigationSearch(false)
+			m.focus = FocusSidebar
+			return m, nil
+		}
+		if m.page == PageHistory && m.input.Value() == "" {
+			m.refillSelectedHistory()
+			return m, nil
+		}
+		if !m.isTextEntryMode() && m.input.Value() == "" {
+			// Keys follow the focused window: only act on the sidebar/list when
+			// it is focused (or on inherently-list pages). When the main panel is
+			// focused, the workspace already had its turn (handleWorkspaceVimKey);
+			// don't leak Enter into the sidebar (e.g. toggling a database).
+			if m.page == PageConnections || m.page == PageHistory || m.focus == FocusSidebar {
+				m.runPageAction(context.Background(), actionOpen)
+			}
+			return m, m.takeCmd()
+		}
+		m.HandleLine(context.Background(), m.input.Value())
+		m.input.Clear()
+		if m.focus == FocusCommand {
+			m.restorePreviousFocus()
+		}
+	case "backspace", "ctrl+h", "alt+backspace":
+		// Ctrl+H focuses the left (sidebar) panel outside text entry; inside a
+		// text field Ctrl+H (= Ctrl+Backspace) and Alt+Backspace delete a word,
+		// while plain Backspace deletes a character.
+		if msg.String() == "ctrl+h" && !m.isTextEntryMode() {
+			m.focus = FocusSidebar
+			return m, nil
+		}
+		if msg.String() == "backspace" && m.focus == FocusCommand && !m.navSearchActive && m.input.Value() == "" {
+			m.exitCommandMode()
+			return m, nil
+		}
+		if msg.String() == "backspace" {
+			m.input.Backspace()
+		} else {
+			m.input.BackspaceWord()
+		}
+		m.syncNavigationSearchInput()
+		if m.helpOpen {
+			m.syncHelpSearch()
+		}
+		m.refreshSuggestions()
+	default:
+		if m.handleRuneKey(context.Background(), msg.String()) {
+			return m, m.takeCmd()
+		}
+		if len(msg.Runes) > 0 && m.isTextEntryMode() {
+			m.input.Insert(string(msg.Runes))
 			m.syncNavigationSearchInput()
 			if m.helpOpen {
 				m.syncHelpSearch()
 			}
 			m.refreshSuggestions()
-		default:
-			if m.handleRuneKey(context.Background(), msg.String()) {
-				return m, m.takeCmd()
-			}
-			if len(msg.Runes) > 0 && m.isTextEntryMode() {
-				m.input.Insert(string(msg.Runes))
-				m.syncNavigationSearchInput()
-				if m.helpOpen {
-					m.syncHelpSearch()
-				}
-				m.refreshSuggestions()
-				return m, nil
-			}
-			if len(msg.Runes) > 0 {
-				m.message = "unsupported shortcut: " + msg.String()
-			}
+			return m, nil
+		}
+		if len(msg.Runes) > 0 {
+			m.message = "unsupported shortcut: " + msg.String()
 		}
 	}
 	return m, m.takeCmd()
@@ -613,9 +645,26 @@ func (m *Model) handleRuneKey(ctx context.Context, key string) bool {
 	return false
 }
 
-func (m *Model) View() string {
+// View is the recover boundary around the real renderer. View runs during the
+// render phase and must not mutate errBox; on panic it flags renderPanicked so
+// the next Update surfaces the error, and returns a safe fallback frame.
+func (m *Model) View() (out string) {
+	defer func() {
+		if r := recover(); r != nil {
+			m.logPanic("View", r)
+			m.renderPanicked = true
+			m.renderPanicMsg = fmt.Sprintf("%v", r)
+			out = safeFrame(r)
+		}
+	}()
+	return m.viewImpl()
+}
+
+func (m *Model) viewImpl() string {
 	frame := m.renderLayout()
 	m.lastFrameLines = strings.Split(frame, "\n") // clean copy for selection extraction
+	m.detectOverlaySelRect()                      // recover active box interior, strip markers
+	frame = strings.ReplaceAll(frame, boxMarker, "")
 	if m.selecting || m.selActive {
 		frame = m.applySelectionHighlight(frame)
 	}
@@ -996,210 +1045,6 @@ func (m *Model) unlock(master string) {
 	m.page = PageConnections
 	m.focus = FocusSidebar
 	m.message = "unlocked"
-}
-
-func (m *Model) handleConnections(ctx context.Context, line string) {
-	parts := splitLine(line)
-	if len(parts) == 0 {
-		return
-	}
-	switch parts[0] {
-	case "new":
-		m.createProfile(parts[1:])
-	case "edit":
-		m.editProfile(parts[1:])
-	case "delete":
-		if len(parts) < 2 {
-			m.message = "usage: delete <profile-id>"
-			return
-		}
-		m.pending = &pendingAction{Kind: "delete-profile", ProfileID: parts[1]}
-		m.message = "delete requires confirmation"
-	case "open":
-		if len(parts) < 2 {
-			m.message = "usage: open <profile-id>"
-			return
-		}
-		m.openProfile(ctx, parts[1])
-	case "test":
-		if len(parts) < 2 {
-			m.message = "usage: test <profile-id>"
-			return
-		}
-		m.testProfile(ctx, parts[1])
-	case "history":
-		m.page = PageHistory
-		m.historyIndex = 0
-	default:
-		m.message = fmt.Sprintf("unknown command: %s", parts[0])
-	}
-}
-
-func (m *Model) createProfile(parts []string) {
-	if len(parts) == 0 {
-		m.message = "usage: new <mysql|doris|mongo|redis> ..."
-		return
-	}
-	driver := config.Driver(parts[0])
-	if driver == config.DriverMongo {
-		m.createMongoProfile(parts[1:])
-		return
-	}
-	if len(parts) < 7 {
-		m.message = "usage: new <mysql|doris|redis> <id> <host> <port> <user> <password> <database|redis-db> [readonly]"
-		return
-	}
-	form := newConnectionForm()
-	form.chooseDriver(driver)
-	form.setFieldValue("id", parts[1])
-	form.setFieldValue("host", parts[2])
-	form.setFieldValue("port", parts[3])
-	form.setFieldValue("user", parts[4])
-	form.setFieldValue("password", parts[5])
-	if driver == config.DriverRedis {
-		form.setFieldValue("db", parts[6])
-	} else {
-		form.setFieldValue("database", parts[6])
-	}
-	if len(parts) > 7 && parts[7] == "readonly" {
-		form.readOnly = true
-	}
-	profile, err := form.buildProfile()
-	if err != nil {
-		m.message = err.Error()
-		return
-	}
-	m.vault.UpsertProfile(profile)
-	m.saveVault("profile saved")
-}
-
-func (m *Model) createMongoProfile(parts []string) {
-	if len(parts) < 2 {
-		m.message = "usage: new mongo <id> <mongodb-uri> [database] [readonly]"
-		return
-	}
-	form := newConnectionForm()
-	form.chooseDriver(config.DriverMongo)
-	form.setFieldValue("id", parts[0])
-	form.setFieldValue("uri", parts[1])
-	for _, part := range parts[2:] {
-		if part == "readonly" {
-			form.readOnly = true
-			continue
-		}
-		form.setFieldValue("database", part)
-	}
-	profile, err := form.buildProfile()
-	if err != nil {
-		m.message = err.Error()
-		return
-	}
-	m.vault.UpsertProfile(profile)
-	m.saveVault("profile saved")
-}
-
-func (m *Model) editProfile(parts []string) {
-	if len(parts) < 2 {
-		m.message = "usage: edit <profile-id> field=value ..."
-		return
-	}
-	profile, ok := m.vault.GetProfile(parts[0])
-	if !ok {
-		m.message = "profile not found"
-		return
-	}
-	for _, assignment := range parts[1:] {
-		field, value, ok := strings.Cut(assignment, "=")
-		if !ok {
-			continue
-		}
-		switch field {
-		case "name":
-			profile.Name = value
-		case "host":
-			profile.Host = value
-		case "port":
-			port, err := strconv.Atoi(value)
-			if err != nil {
-				m.message = "invalid port: " + value
-				return
-			}
-			profile.Port = port
-		case "user":
-			profile.User = value
-		case "password":
-			profile.Password = value
-		case "database":
-			profile.Database = value
-		case "authdb":
-			profile.AuthDB = value
-		case "redisdb":
-			redisDB, err := strconv.Atoi(value)
-			if err != nil {
-				m.message = "invalid redis db: " + value
-				return
-			}
-			profile.RedisDB = redisDB
-		case "readonly":
-			profile.ReadOnly = value == "true" || value == "1" || value == "yes"
-		}
-	}
-	m.vault.UpsertProfile(profile)
-	m.saveVault("profile updated")
-}
-
-func (m *Model) openProfile(ctx context.Context, id string) {
-	profile, ok := m.vault.GetProfile(id)
-	if !ok {
-		m.message = "profile not found"
-		return
-	}
-	// Deduplicate: if this connection is already open, switch to its session.
-	if idx := m.sessionIndexForProfile(id); idx >= 0 {
-		m.switchSession(idx)
-		return
-	}
-	adapter, err := m.openAdapter(profile)
-	if err != nil {
-		m.message = err.Error()
-		return
-	}
-	// Open as a new connection session (preserving any current one).
-	m.saveActiveSession()
-	m.sessions = append(m.sessions, connSession{
-		profile:         profile,
-		adapter:         adapter,
-		selectedDB:      profile.Database,
-		databaseObjects: map[string][]db.Object{},
-		expandedDBs:     map[string]bool{},
-		expandedMeta:    map[string]bool{},
-		redisPattern:    "*",
-		page:            PageBrowser,
-		focus:           FocusSidebar,
-	})
-	m.loadSession(len(m.sessions) - 1)
-	m.refreshBrowser(ctx)
-}
-
-func (m *Model) testProfile(ctx context.Context, id string) {
-	profile, ok := m.vault.GetProfile(id)
-	if !ok {
-		m.message = "profile not found"
-		return
-	}
-	adapter, err := m.openAdapter(profile)
-	if err != nil {
-		m.message = err.Error()
-		return
-	}
-	defer adapter.Close()
-	ctx, cancel := m.dbContext(ctx)
-	defer cancel()
-	if err := adapter.Test(ctx); err != nil {
-		m.message = "test failed: " + err.Error()
-		return
-	}
-	m.message = "test ok"
 }
 
 func (m *Model) handleBrowser(ctx context.Context, line string) {

@@ -2,15 +2,26 @@ package app
 
 import (
 	"fmt"
+	"math"
 	"net/url"
 	"regexp"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/mattn/go-runewidth"
 
 	"tdb/internal/config"
 )
+
+// sidebarWidthCond measures display width treating East Asian Ambiguous-width
+// characters as 2 cells. lipgloss.Width (via x/ansi) always counts them as 1 and
+// ignores go-runewidth's global setting, but CJK terminals render the sidebar's
+// ambiguous glyphs (▦ ◫ ◆ ◇ ▾ ▸ and the │ scrollbar) 2 cells wide. Budgeting the
+// tree rows with this condition keeps a row's real terminal width within the pane
+// so long object names no longer overflow and wrap. On terminals that render
+// these as 1 cell it only leaves a harmless 1–2 cell gap, never an overflow.
+var sidebarWidthCond = &runewidth.Condition{EastAsianWidth: true}
 
 type Focus string
 
@@ -991,7 +1002,8 @@ func (m *Model) connectionsList(width int) string {
 }
 
 func (m *Model) browserList() string {
-	return m.renderBrowserNodes(m.browserNodes(), 0, 0, false)
+	nodes := m.browserNodes()
+	return m.renderBrowserNodes(nodes, 0, 0, len(nodes))
 }
 
 func (m *Model) browserListVisible(height, width int) string {
@@ -1001,7 +1013,7 @@ func (m *Model) browserListVisible(height, width int) string {
 	}
 	scrollWidth := 0
 	if len(nodes) > height {
-		scrollWidth = 1
+		scrollWidth = sidebarWidthCond.StringWidth("│")
 	}
 	rowWidth := max(1, width-scrollWidth-2)
 	maxLineWidth := maxNodeLineWidth(nodes)
@@ -1012,23 +1024,21 @@ func (m *Model) browserListVisible(height, width int) string {
 		rowHeight--
 	}
 	visible, offset := m.visibleBrowserNodes(rowHeight)
-	body := m.renderBrowserNodes(visible, offset, rowWidth, len(nodes) > rowHeight)
+	body := m.renderBrowserNodes(visible, offset, rowWidth, len(nodes))
 	if horizontal {
 		body = strings.TrimRight(body, "\n") + "\n" + horizontalScrollbar(width, m.navHorizontalOffset, maxLineWidth, rowWidth)
 	}
 	return body
 }
 
-func (m *Model) renderBrowserNodes(nodes []navNode, offset, width int, verticalScrollbar bool) string {
+func (m *Model) renderBrowserNodes(nodes []navNode, offset, width, total int) string {
 	var b strings.Builder
 	theme := defaultTheme()
 	if len(nodes) == 0 {
 		return defaultTheme().muted.Render("no objects")
 	}
-	thumb := -1
-	if verticalScrollbar && len(nodes) > 0 {
-		thumb = clamp(m.browserCursor-offset, 0, len(nodes)-1)
-	}
+	// Proportional scrollbar (nil when everything fits).
+	bar := verticalScrollbar(len(nodes), total, len(nodes), offset)
 	for i, node := range nodes {
 		selected := offset+i == m.browserCursor
 		var line string
@@ -1040,17 +1050,13 @@ func (m *Model) renderBrowserNodes(nodes []navNode, offset, width int, verticalS
 		} else {
 			line = strings.Repeat("  ", node.Depth) + node.Label
 			if width > 0 {
-				line = cellSlice(line, m.navHorizontalOffset, width)
-				line = padCells(line, width)
+				line = cellSliceWide(line, m.navHorizontalOffset, width)
+				line = padCellsWide(line, width)
 			}
 			line = sidebarCursorLine(theme, line, selected, m.focus == FocusSidebar)
 		}
-		if verticalScrollbar {
-			bar := "│"
-			if i == thumb {
-				bar = "┃"
-			}
-			line += bar
+		if bar != nil {
+			line += barCell(bar, i)
 		}
 		b.WriteString(line + "\n")
 	}
@@ -1060,9 +1066,47 @@ func (m *Model) renderBrowserNodes(nodes []navNode, offset, width int, verticalS
 func maxNodeLineWidth(nodes []navNode) int {
 	width := 0
 	for _, node := range nodes {
-		width = max(width, lipgloss.Width(strings.Repeat("  ", node.Depth)+node.Label))
+		width = max(width, sidebarWidthCond.StringWidth(strings.Repeat("  ", node.Depth)+node.Label))
 	}
 	return width
+}
+
+// cellSliceWide / padCellsWide mirror cellSlice / padCells but measure with
+// sidebarWidthCond (ambiguous = 2 cells) so the sidebar tree's clipping and
+// padding match how a CJK terminal actually renders its glyphs.
+func cellSliceWide(value string, offset, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	offset = max(0, offset)
+	var b strings.Builder
+	pos := 0
+	written := 0
+	for _, r := range value {
+		partWidth := max(1, sidebarWidthCond.RuneWidth(r))
+		if pos+partWidth <= offset {
+			pos += partWidth
+			continue
+		}
+		if written+partWidth > width {
+			break
+		}
+		b.WriteRune(r)
+		written += partWidth
+		pos += partWidth
+	}
+	return b.String()
+}
+
+func padCellsWide(value string, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	current := sidebarWidthCond.StringWidth(value)
+	if current >= width {
+		return value
+	}
+	return value + strings.Repeat(" ", width-current)
 }
 
 func cellSlice(value string, offset, width int) string {
@@ -1114,6 +1158,68 @@ func horizontalScrollbar(width, offset, contentWidth, viewportWidth int) string 
 		right = " "
 	}
 	return left + strings.Repeat("─", max(0, width-2)) + right
+}
+
+// verticalScrollbar builds a right-edge scrollbar of `height` single-cell rows:
+// a dim track `│` with a bright proportional thumb `┃` whose length reflects the
+// visible fraction (viewport/total) and whose position reflects offset. Returns
+// nil when the content fits (caller then reserves no column). Both glyphs are
+// box-drawing, so a drag-selection that crosses the bar copies clean text
+// (stripSelectionFrame discards them).
+func verticalScrollbar(height, total, viewport, offset int) []string {
+	if height <= 0 || total <= viewport {
+		return nil
+	}
+	theme := defaultTheme()
+	thumbLen := clamp(int(math.Round(float64(height*viewport)/float64(total))), 1, height)
+	maxThumbTop := height - thumbLen
+	maxOffset := max(1, total-viewport)
+	thumbTop := clamp(int(math.Round(float64(offset*maxThumbTop)/float64(maxOffset))), 0, maxThumbTop)
+	// Pin the extremes so "at top" / "at bottom" are unambiguous.
+	switch {
+	case offset <= 0:
+		thumbTop = 0
+	case offset >= maxOffset:
+		thumbTop = maxThumbTop
+	}
+	bar := make([]string, height)
+	for i := range bar {
+		if i >= thumbTop && i < thumbTop+thumbLen {
+			bar[i] = theme.accent.Render("┃")
+		} else {
+			bar[i] = theme.scrollbar.Render("│")
+		}
+	}
+	return bar
+}
+
+// appendVScrollbar pads each (plain-text) line to innerWidth-1 cells and appends
+// the matching bar cell, returning rows of exactly innerWidth cells.
+func appendVScrollbar(lines, bar []string, innerWidth int) []string {
+	out := make([]string, len(lines))
+	for i, line := range lines {
+		body := padCells(cellSlice(line, 0, innerWidth-1), innerWidth-1)
+		out[i] = body + barCell(bar, i)
+	}
+	return out
+}
+
+// appendVScrollbarANSI is appendVScrollbar for lines that may carry ANSI color
+// (data grid, result table, documents, modals) — it slices/pads ANSI-aware.
+func appendVScrollbarANSI(lines, bar []string, innerWidth int) []string {
+	out := make([]string, len(lines))
+	for i, line := range lines {
+		body := padCellsANSI(sliceColumns(line, 0, innerWidth-1), innerWidth-1)
+		out[i] = body + barCell(bar, i)
+	}
+	return out
+}
+
+func barCell(bar []string, i int) string {
+	if i < 0 || i >= len(bar) {
+		return " "
+	}
+	return bar[i]
 }
 
 func (m *Model) historyList() string {

@@ -33,6 +33,20 @@ type modalState struct {
 	ScrollOffset int
 }
 
+// overlayState owns the floating overlays that sit above the panels and
+// intercept keys first: modals, the error box, the help panel, and the pending
+// confirmation. Embedded in Model so existing m.modal / m.errBox / m.helpOpen …
+// access keeps working via field promotion.
+type overlayState struct {
+	helpOpen           bool
+	errBox             *errorBox
+	modal              *modalState
+	modalPreviousFocus Focus
+	helpSearch         string
+	modalRowHits       []Hitbox // clickable rows of the active modal (e.g. db picker)
+	pending            *pendingAction
+}
+
 func (m *Model) handleOverlayKey(msg tea.KeyMsg) bool {
 	if !m.overlayOpen() {
 		return false
@@ -208,6 +222,7 @@ func (m *Model) applyDatabaseSelection(database string) {
 	tab.QueryCatalog = ""
 	tab.QueryDatabasePinned = true
 	m.syncActiveTabState()
+	m.highlightSidebarForActiveTab()
 	m.message = "database: " + database
 	if m.adapter == nil {
 		return
@@ -426,9 +441,12 @@ func (m *Model) modalBox(title, body, border string) string {
 	innerWidth := max(24, width-4)
 	header := defaultTheme().sectionTitle.Render(title)
 	if m.modal != nil {
-		body = m.visibleModalBody(body)
+		body = m.visibleModalBody(body, max(1, innerWidth-2))
 	}
 	content := header + "\n" + body
+	// Tag the box interior so View can clamp the drag selection inside the border.
+	// Padding(0,1) eats one column each side, so the content width is innerWidth-2.
+	content = m.markOverlayBox(content, max(1, innerWidth-2))
 	return lipgloss.NewStyle().
 		Width(innerWidth).
 		Border(lipgloss.RoundedBorder()).
@@ -437,14 +455,38 @@ func (m *Model) modalBox(title, body, border string) string {
 		Render(content)
 }
 
-func (m *Model) visibleModalBody(body string) string {
+// markOverlayBox tags the first and last line of an overlay's content with the
+// zero-width boxMarker and records the content width, so detectOverlaySelRect can
+// recover the box's inner rectangle from the composed frame. Zero width → it
+// never shifts layout (same pattern as cursorMarker/rowMarker).
+func (m *Model) markOverlayBox(content string, contentWidth int) string {
+	m.overlayBoxWidth = contentWidth
+	lines := strings.Split(content, "\n")
+	if len(lines) == 0 {
+		return content
+	}
+	lines[0] = boxMarker + lines[0]
+	lines[len(lines)-1] = boxMarker + lines[len(lines)-1]
+	return strings.Join(lines, "\n")
+}
+
+// visibleModalBody windows the body to the modal height and, when it overflows,
+// appends a right-edge scrollbar to each visible line (reserving one column of
+// contentWidth). Returns natural lines when everything fits.
+func (m *Model) visibleModalBody(body string, contentWidth int) string {
 	if m.modal == nil {
 		return body
 	}
 	height := m.modalBodyHeight()
-	maxOffset := m.modalMaxOffset(body)
-	m.modal.ScrollOffset = clamp(m.modal.ScrollOffset, 0, maxOffset)
-	return sliceLines(body, m.modal.ScrollOffset, height)
+	total := len(contentLines(body))
+	m.modal.ScrollOffset = clamp(m.modal.ScrollOffset, 0, max(0, total-height))
+	windowed := sliceLines(body, m.modal.ScrollOffset, height)
+	bar := verticalScrollbar(height, total, height, m.modal.ScrollOffset)
+	if bar == nil {
+		return windowed
+	}
+	lines := strings.Split(windowed, "\n")
+	return strings.Join(appendVScrollbarANSI(lines, bar, max(1, contentWidth)), "\n")
 }
 
 func (m *Model) scrollModal(delta int) {
@@ -529,14 +571,7 @@ func sliceLines(content string, offset, height int) string {
 	}
 	offset = clamp(offset, 0, max(0, len(lines)-height))
 	end := min(len(lines), offset+height)
-	visible := append([]string{}, lines[offset:end]...)
-	if offset > 0 && len(visible) > 0 {
-		visible[0] = defaultTheme().muted.Render("↑") + " " + visible[0]
-	}
-	if end < len(lines) {
-		visible = append(visible, defaultTheme().muted.Render("↓"))
-	}
-	return strings.Join(visible, "\n")
+	return strings.Join(lines[offset:end], "\n")
 }
 
 func (m *Model) historyModalContent() string {

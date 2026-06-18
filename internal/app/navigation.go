@@ -390,6 +390,64 @@ func (m *Model) focusSearchMatch(match navSearchMatch) bool {
 	return false
 }
 
+// highlightSidebarForActiveTab moves the sidebar cursor to the database the
+// active workspace tab belongs to, so the left tree highlight follows the page
+// opened on the right. For data tabs it prefers the matching object node (when
+// the database is expanded) and falls back to the database node otherwise. It is
+// a no-op for drivers without databases (e.g. Redis, where the tab has no
+// database). Call this from tab switch/open events — never from
+// syncActiveTabState/bindActiveQueryTabToSelection, which would yank the cursor
+// away while the user navigates the sidebar.
+func (m *Model) highlightSidebarForActiveTab() {
+	tab := m.activeWorkspaceTab()
+	if tab == nil {
+		return
+	}
+	var cat, dbName, object string
+	switch tab.Kind {
+	case workspaceTabData:
+		cat = tab.Target.Catalog
+		dbName = tab.Target.Database
+		object = tab.Target.Name
+	case workspaceTabQuery:
+		cat = tab.QueryCatalog
+		dbName = tab.QueryDatabase
+	}
+	if dbName == "" {
+		return
+	}
+	m.selectedDB = dbName
+	m.selectedCatalog = cat
+	key := m.scopeKey(cat, dbName)
+	// Align m.objects with the new selectedDB *before* any ensureNavigationState
+	// runs (ensureQueryObjectsLoaded triggers one): that heuristic binds m.objects
+	// to selectedDB's key, so a stale previous-database m.objects would otherwise be
+	// mis-bound here. nil is fine — the len>0 guard then skips the bind.
+	m.objects = m.databaseObjects[key]
+	// Load the target database's objects (once) and auto-expand it so the followed
+	// database reveals its collections/tables.
+	m.ensureQueryObjectsLoaded(cat, dbName)
+	m.objects = m.databaseObjects[key]
+	m.expandedDBs[key] = true
+	nodes := m.browserNodes()
+	if object != "" {
+		for i, node := range nodes {
+			if node.Kind == navNodeObject && node.Catalog == cat && node.Database == dbName && node.Object.Name == object {
+				m.browserCursor = i
+				m.syncBrowserSelectionFromCursor()
+				return
+			}
+		}
+	}
+	for i, node := range nodes {
+		if node.Kind == navNodeDatabase && node.Catalog == cat && node.Database == dbName {
+			m.browserCursor = i
+			m.syncBrowserSelectionFromCursor()
+			return
+		}
+	}
+}
+
 func (m *Model) selectedBrowserNode() (navNode, bool) {
 	nodes := m.browserNodes()
 	if len(nodes) == 0 {

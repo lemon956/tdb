@@ -17,6 +17,26 @@ import (
 	"tdb/internal/suggest"
 )
 
+// aiAskTimeout bounds an AI CLI call. It is far longer than the database query
+// timeout (defaultQueryTimeout) because agentic CLIs (claude/codex) legitimately
+// take minutes on a complex multi-table question; the DB timeout would SIGKILL
+// them mid-thought ("signal: killed"). Esc still cancels sooner.
+const aiAskTimeout = 5 * time.Minute
+
+// aiPanelState owns the AI assistant's conversations and inline-modal state. It
+// is embedded in Model so existing m.aiSessions / m.aiActive / m.aiStore … access
+// keeps working via field promotion.
+type aiPanelState struct {
+	aiSessions    map[string]*aiSession         // AI conversations keyed by session ID
+	aiActive      map[string]string             // aiSessionKey() -> active session ID (per connection+database)
+	aiStore       *aichat.Store                 // persists conversations across restarts
+	aiLoaded      bool                          // sessions hydrated from aiStore yet?
+	aiListMode    aiListMode                    // inline sub-view inside the AI chat window
+	aiSuggestKind aiSuggestKind                 // whether the input dropdown lists commands or @tables
+	aiMetaCache   map[string]*db.ObjectMetadata // table metadata (cols/partition/key), keyed by driver+catalog+db+table
+	aiSQLChoices  []string                      // SQL blocks offered by the ctrl+y picker
+}
+
 // aiTurn is one message in an AI conversation. role is "you", "ai", or "err".
 type aiTurn struct {
 	role string
@@ -683,9 +703,24 @@ func (m *Model) submitAIMessage() {
 	m.input.Clear()
 	m.scrollAIToBottom()
 	id := sess.id
-	m.nextCmd = m.runAsync("AI…", func(ctx context.Context) tea.Msg {
+	m.nextCmd = m.runAIAsync("AI…", aiAskTimeout, func(ctx context.Context) tea.Msg {
 		reply, askErr := provider.Ask(ctx, prompt)
+		// An agentic CLI killed by our context reports a bare "signal: killed";
+		// classify it so the message is actionable.
+		if askErr != nil {
+			switch ctx.Err() {
+			case context.DeadlineExceeded:
+				askErr = fmt.Errorf("AI timed out after %s (Esc to cancel sooner, or simplify the question)", aiAskTimeout)
+			case context.Canceled:
+				askErr = fmt.Errorf("AI request cancelled")
+			default:
+				// ctx is fine → the process died on its own (likely OOM / killed by
+				// the system). Keep the raw error but hint at the cause.
+				askErr = fmt.Errorf("%w — the AI process was terminated (possibly out of memory)", askErr)
+			}
+		}
 		return asyncResultMsg{apply: func(m *Model) {
+			m.aiCancelOp = nil
 			s := m.aiSessions[id]
 			if s == nil {
 				return
