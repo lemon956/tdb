@@ -36,7 +36,16 @@ impl SqlAdapter {
         } else {
             dsn::build_mysql_url(profile)
         };
-        let opts = MySqlConnectOptions::from_str(&url)?;
+        let mut opts = MySqlConnectOptions::from_str(&url)?;
+        if is_doris {
+            // sqlx bootstraps each MySQL connection with
+            // `SET sql_mode=(SELECT CONCAT(@@sql_mode, ',PIPES_AS_CONCAT,
+            // NO_ENGINE_SUBSTITUTION'))`, whose subquery Doris rejects with
+            // "Set statement does't support non-constant expr". Disabling both
+            // tweaks drops that SET entirely, leaving only the constant
+            // NAMES/time_zone bootstrap that Doris accepts.
+            opts = opts.pipes_as_concat(false).no_engine_substitution(false);
+        }
         // Lazy like Go's sql.Open: the first real query (Test) surfaces a
         // connection error.
         let pool = MySqlPool::connect_lazy_with(opts);
@@ -48,13 +57,20 @@ impl SqlAdapter {
     }
 
     pub async fn test(&self) -> Result<()> {
-        sqlx::query("SELECT 1").execute(&self.pool).await?;
+        // Doris only prepares primary-key point queries ("Only support prepare
+        // SelectStmt point query now"), so probe over the simple/text protocol.
+        if self.is_doris {
+            let mut conn = self.pool.acquire().await?;
+            conn.execute("SELECT 1").await?;
+        } else {
+            sqlx::query("SELECT 1").execute(&self.pool).await?;
+        }
         Ok(())
     }
 
     pub async fn list_databases(&self) -> Result<Vec<String>> {
         let mut conn = self.pool.acquire().await?;
-        list_databases_on(&mut conn).await
+        list_databases_on(&mut conn, self.is_doris).await
     }
 
     pub async fn list_catalogs(&self) -> Result<Vec<String>> {
@@ -62,7 +78,7 @@ impl SqlAdapter {
             return Ok(Vec::new());
         }
         let mut conn = self.pool.acquire().await?;
-        let rows = sqlx::query("SHOW CATALOGS").fetch_all(conn.as_mut()).await?;
+        let rows = query_all(conn.as_mut(), "SHOW CATALOGS", true).await?;
         let mut catalogs = Vec::new();
         for row in &rows {
             let map = row_to_string_map(row);
@@ -88,16 +104,16 @@ impl SqlAdapter {
             return self.list_databases().await;
         }
         let mut conn = self.pool.acquire().await?;
-        use_scope(&mut conn, catalog, "").await?;
-        list_databases_on(&mut conn).await
+        use_scope(&mut conn, catalog, "", self.is_doris).await?;
+        list_databases_on(&mut conn, self.is_doris).await
     }
 
     pub async fn list_objects(&self, scope: Scope) -> Result<Vec<Object>> {
         let mut conn = self.pool.acquire().await?;
-        if !is_internal_catalog(&scope.catalog) {
-            use_scope(&mut conn, &scope.catalog, "").await?;
+        if self.is_doris || !is_internal_catalog(&scope.catalog) {
+            use_scope(&mut conn, &scope.catalog, "", self.is_doris).await?;
         }
-        list_objects_on(&mut conn, &scope.database).await
+        list_objects_on(&mut conn, &scope.database, self.is_doris).await
     }
 
     pub async fn preview(&self, target: Target, query: Query, page: Page) -> Result<Set> {
@@ -124,10 +140,10 @@ impl SqlAdapter {
 
     pub async fn metadata(&self, target: Target) -> Result<ObjectMetadata> {
         let mut conn = self.pool.acquire().await?;
-        if !is_internal_catalog(&target.catalog) {
-            use_scope(&mut conn, &target.catalog, &target.database).await?;
+        if self.is_doris || !is_internal_catalog(&target.catalog) {
+            use_scope(&mut conn, &target.catalog, &target.database, self.is_doris).await?;
         }
-        metadata_on(&mut conn, &target).await
+        metadata_on(&mut conn, &target, self.is_doris).await
     }
 
     pub async fn execute(&self, command: Command) -> Result<Set> {
@@ -213,8 +229,8 @@ impl SqlAdapter {
         if disable_pipelinex {
             disable_pipelinex_engine(&mut conn).await;
         }
-        use_scope(&mut conn, catalog, database).await?;
-        fetch_set(&mut conn, sql, limit).await
+        use_scope(&mut conn, catalog, database, self.is_doris).await?;
+        fetch_set(&mut conn, sql, limit, self.is_doris).await
     }
 
     async fn exec_scoped_mutation(&self, catalog: &str, database: &str, sql: &str) -> Result<i64> {
@@ -223,8 +239,14 @@ impl SqlAdapter {
             if disable {
                 disable_pipelinex_engine(&mut conn).await;
             }
-            use_scope(&mut conn, catalog, database).await?;
-            let r = sqlx::query(sql).execute(conn.as_mut()).await?;
+            use_scope(&mut conn, catalog, database, self.is_doris).await?;
+            // Doris rejects the prepared protocol for general DML, so route its
+            // mutations through the simple/text protocol (an unprepared `&str`).
+            let r = if self.is_doris {
+                conn.execute(sql).await?
+            } else {
+                sqlx::query(sql).execute(conn.as_mut()).await?
+            };
             Ok::<i64, anyhow::Error>(r.rows_affected() as i64)
         };
         match run(false).await {
@@ -236,6 +258,13 @@ impl SqlAdapter {
 
     async fn exec_mutation_args(&self, sql: &str, args: &[Value]) -> Result<MutationResult> {
         let mut conn = self.pool.acquire().await?;
+        // Doris cannot prepare general DML, so inline the bound values as SQL
+        // literals and run unprepared; MySQL keeps the safer prepared binding.
+        if self.is_doris {
+            let stmt = interpolate_placeholders(sql, args);
+            let r = conn.execute(stmt.as_str()).await?;
+            return Ok(result::new_mutation_result(r.rows_affected() as i64));
+        }
         let mut q = sqlx::query(sql);
         for a in args {
             q = bind_value(q, a);
@@ -251,13 +280,24 @@ fn is_internal_catalog(catalog: &str) -> bool {
     catalog.is_empty() || catalog.eq_ignore_ascii_case("internal")
 }
 
-async fn use_scope(conn: &mut MySqlConnection, catalog: &str, database: &str) -> Result<()> {
+async fn use_scope(
+    conn: &mut MySqlConnection,
+    catalog: &str,
+    database: &str,
+    doris: bool,
+) -> Result<()> {
     // `USE`/`SWITCH` are not allowed in the prepared-statement protocol (MySQL
     // error 1295), so run them via the simple/text protocol by passing a &str
     // (which sqlx executes unprepared).
     if !is_internal_catalog(catalog) {
         let stmt = format!("SWITCH {}", dsn::quote_identifier(catalog));
         conn.execute(stmt.as_str()).await?;
+    } else if doris {
+        // A pooled Doris connection may still carry a previously-SWITCHed
+        // external catalog, and `USE <db>` does not reset it, so an internal
+        // object would silently resolve against the wrong catalog. Switch back
+        // to the internal catalog explicitly first.
+        conn.execute("SWITCH internal").await?;
     }
     if !database.is_empty() {
         let stmt = format!("USE {}", dsn::quote_identifier(database));
@@ -272,9 +312,10 @@ async fn disable_pipelinex_engine(conn: &mut MySqlConnection) {
         "experimental_enable_pipeline_x_engine",
         "enable_pipeline_engine",
     ] {
-        let _ = sqlx::query(&format!("SET {name} = false"))
-            .execute(&mut *conn)
-            .await;
+        // Run over the simple/text protocol: Doris does not allow `SET` through
+        // the prepared protocol, so a prepared query here would always fail and
+        // the pipelineX fallback would silently never take effect.
+        let _ = conn.execute(format!("SET {name} = false").as_str()).await;
     }
 }
 
@@ -286,8 +327,21 @@ fn is_pipelinex_unsupported(err: &anyhow::Error) -> bool {
     msg.contains("pipelinex") && msg.contains("scan_node")
 }
 
-async fn list_databases_on(conn: &mut MySqlConnection) -> Result<Vec<String>> {
-    let rows = sqlx::query("SHOW DATABASES").fetch_all(&mut *conn).await?;
+/// Fetch all rows for a row-returning statement, choosing the wire protocol by
+/// driver: Doris only supports the prepared protocol for primary-key point
+/// queries, so its statements run over the simple/text protocol (an unprepared
+/// `&str`); MySQL keeps the prepared protocol that the MySQL checks validated.
+async fn query_all(conn: &mut MySqlConnection, sql: &str, doris: bool) -> Result<Vec<MySqlRow>> {
+    let rows = if doris {
+        (&mut *conn).fetch_all(sql).await?
+    } else {
+        sqlx::query(sql).fetch_all(&mut *conn).await?
+    };
+    Ok(rows)
+}
+
+async fn list_databases_on(conn: &mut MySqlConnection, doris: bool) -> Result<Vec<String>> {
+    let rows = query_all(conn, "SHOW DATABASES", doris).await?;
     let mut out = Vec::new();
     for row in &rows {
         out.push(decode_to_string(row, 0));
@@ -295,12 +349,16 @@ async fn list_databases_on(conn: &mut MySqlConnection) -> Result<Vec<String>> {
     Ok(out)
 }
 
-async fn list_objects_on(conn: &mut MySqlConnection, database: &str) -> Result<Vec<Object>> {
+async fn list_objects_on(
+    conn: &mut MySqlConnection,
+    database: &str,
+    doris: bool,
+) -> Result<Vec<Object>> {
     let mut sql = "SHOW FULL TABLES".to_string();
     if !database.is_empty() {
         sql += &format!(" FROM {}", dsn::quote_identifier(database));
     }
-    let rows = sqlx::query(&sql).fetch_all(&mut *conn).await?;
+    let rows = query_all(conn, &sql, doris).await?;
     let mut objects = Vec::new();
     for row in &rows {
         let name = decode_to_string(row, 0);
@@ -322,13 +380,17 @@ async fn list_objects_on(conn: &mut MySqlConnection, database: &str) -> Result<V
     Ok(objects)
 }
 
-async fn metadata_on(conn: &mut MySqlConnection, target: &Target) -> Result<ObjectMetadata> {
+async fn metadata_on(
+    conn: &mut MySqlConnection,
+    target: &Target,
+    doris: bool,
+) -> Result<ObjectMetadata> {
     let name = qualified_name(target);
     let columns_sql = format!("SHOW FULL COLUMNS FROM {name}");
     let indexes_sql = format!("SHOW INDEX FROM {name}");
 
     let mut fields = Vec::new();
-    let rows = sqlx::query(&columns_sql).fetch_all(&mut *conn).await?;
+    let rows = query_all(conn, &columns_sql, doris).await?;
     for row in &rows {
         let m = row_to_string_map(row);
         fields.push(crate::db::MetadataField {
@@ -344,7 +406,7 @@ async fn metadata_on(conn: &mut MySqlConnection, target: &Target) -> Result<Obje
     }
 
     let mut indexes: Vec<crate::db::MetadataIndex> = Vec::new();
-    let rows = sqlx::query(&indexes_sql).fetch_all(&mut *conn).await?;
+    let rows = query_all(conn, &indexes_sql, doris).await?;
     for row in &rows {
         let m = row_to_string_map(row);
         let Some(key_name) = m.get("Key_name").filter(|s| !s.is_empty()) else {
@@ -373,7 +435,7 @@ async fn metadata_on(conn: &mut MySqlConnection, target: &Target) -> Result<Obje
         attributes: Default::default(),
     };
     if target.type_ == ObjectType::Table {
-        if let Some(attrs) = table_shape_attributes(conn, target).await {
+        if let Some(attrs) = table_shape_attributes(conn, target, doris).await {
             meta.attributes = attrs;
         }
     }
@@ -383,9 +445,10 @@ async fn metadata_on(conn: &mut MySqlConnection, target: &Target) -> Result<Obje
 async fn table_shape_attributes(
     conn: &mut MySqlConnection,
     target: &Target,
+    doris: bool,
 ) -> Option<std::collections::BTreeMap<String, String>> {
     let sql = format!("SHOW CREATE TABLE {}", qualified_name(target));
-    let rows = sqlx::query(&sql).fetch_all(&mut *conn).await.ok()?;
+    let rows = query_all(conn, &sql, doris).await.ok()?;
     let row = rows.first()?;
     let m = row_to_string_map(row);
     let ddl = m
@@ -409,8 +472,15 @@ async fn table_shape_attributes(
 
 /// Materialize a row-returning query, stopping at `limit` rows (0 = no cap). The
 /// stream is consumed lazily so a huge result is capped without loading it all.
-async fn fetch_set(conn: &mut MySqlConnection, sql: &str, limit: usize) -> Result<Set> {
-    let mut stream = sqlx::query(sql).fetch(&mut *conn);
+async fn fetch_set(conn: &mut MySqlConnection, sql: &str, limit: usize, doris: bool) -> Result<Set> {
+    // Doris streams over the simple/text protocol (it cannot prepare general
+    // selects); MySQL streams over the prepared protocol. Both stop at `limit`
+    // rows so a huge result is capped without materializing it all.
+    let mut stream = if doris {
+        (&mut *conn).fetch(sql)
+    } else {
+        sqlx::query(sql).fetch(&mut *conn)
+    };
     let mut collected: Vec<MySqlRow> = Vec::new();
     let mut truncated = false;
     while let Some(row) = stream.try_next().await? {
@@ -497,6 +567,17 @@ fn decode_cell(row: &MySqlRow, i: usize) -> Value {
             return Value::String(d.to_string());
         }
     }
+    if ty.contains("BOOL") {
+        // Doris reports a dedicated BOOLEAN type (MySQL surfaces it as TINYINT,
+        // which the INT branch below handles); sqlx rejects String/Vec<u8> for
+        // it, so decode it explicitly or it would fall through to NULL.
+        if let Some(v) = try_get!(bool) {
+            return Value::Bool(v);
+        }
+        if let Some(v) = try_get!(i64) {
+            return Value::Bool(v != 0);
+        }
+    }
     if ty.contains("INT") {
         if let Some(v) = try_get!(i64) {
             return Value::Number(v.into());
@@ -527,7 +608,14 @@ fn decode_cell(row: &MySqlRow, i: usize) -> Value {
             return Value::String(v.format("%H:%M:%S").to_string());
         }
     }
-    // Strings, JSON, enums, sets, years, and anything else.
+    if ty.contains("JSON") {
+        // sqlx rejects a String/Vec<u8> type check on JSON columns, so decode it
+        // as a JSON value (returned as-is); otherwise it would surface as NULL.
+        if let Some(v) = try_get!(Value) {
+            return v;
+        }
+    }
+    // Strings, enums, sets, years, and anything else.
     if let Some(s) = try_get!(String) {
         return Value::String(s);
     }
@@ -556,6 +644,52 @@ fn bind_value<'q>(
         Value::String(s) => q.bind(s.clone()),
         other => q.bind(other.to_string()),
     }
+}
+
+/// Replace `?` placeholders with inlined SQL literals, for the Doris mutation
+/// path that cannot use the prepared protocol. `?` inside backtick-quoted
+/// identifiers is left untouched; the builders never emit string literals, so
+/// every remaining `?` is a real placeholder consumed in order.
+fn interpolate_placeholders(sql: &str, args: &[Value]) -> String {
+    let mut out = String::with_capacity(sql.len() + args.len() * 4);
+    let mut args = args.iter();
+    let mut in_tick = false;
+    for c in sql.chars() {
+        match c {
+            '`' => {
+                in_tick = !in_tick;
+                out.push(c);
+            }
+            '?' if !in_tick => match args.next() {
+                Some(v) => out.push_str(&sql_literal(v)),
+                None => out.push('?'),
+            },
+            _ => out.push(c),
+        }
+    }
+    out
+}
+
+fn sql_literal(v: &Value) -> String {
+    match v {
+        Value::Null => "NULL".to_string(),
+        Value::Bool(b) => if *b { "1" } else { "0" }.to_string(),
+        Value::Number(n) => n.to_string(),
+        Value::String(s) => format!("'{}'", escape_sql_string(s)),
+        other => format!("'{}'", escape_sql_string(&other.to_string())),
+    }
+}
+
+fn escape_sql_string(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '\'' => out.push_str("''"),
+            '\\' => out.push_str("\\\\"),
+            _ => out.push(c),
+        }
+    }
+    out
 }
 
 // ---- pure SQL builders (unit-tested without a database) ----

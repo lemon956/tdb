@@ -576,10 +576,32 @@ fn render_query_tab(
         super::state::VimMode::Visual => ("VISUAL", theme::CURSOR),
     };
     let sep_text = format!("── SQL · {mode_label} ");
-    let sep_fill = "─".repeat((sep.width as usize).saturating_sub(sep_text.width()));
+    // Scope indicator: which catalog/database ad-hoc queries run against. This
+    // matters on Doris, where an external catalog can be the active scope and an
+    // unqualified `FROM t` would otherwise silently target the wrong catalog.
+    let (scope_text, external) = app
+        .active_session()
+        .map(|s| {
+            let cat = s.current_catalog.as_str();
+            let db = s.current_database.as_str();
+            let external = !cat.is_empty() && !cat.eq_ignore_ascii_case("internal");
+            let label = if external {
+                format!("· {cat}.{db} ")
+            } else if !db.is_empty() {
+                format!("· {db} ")
+            } else {
+                String::new()
+            };
+            (label, external)
+        })
+        .unwrap_or_default();
+    let scope_color = if external { theme::WARNING } else { theme::MUTED };
+    let used = sep_text.width() + scope_text.width();
+    let sep_fill = "─".repeat((sep.width as usize).saturating_sub(used));
     f.render_widget(
         Paragraph::new(Line::from(vec![
             Span::styled(sep_text, Style::default().fg(mode_color).add_modifier(Modifier::BOLD)),
+            Span::styled(scope_text, Style::default().fg(scope_color).add_modifier(Modifier::BOLD)),
             Span::styled(sep_fill, Style::default().fg(theme::BORDER)),
         ]))
         .style(Style::default().bg(theme::MAIN_BG)),
