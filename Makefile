@@ -1,20 +1,16 @@
-.PHONY: build test vet syntax
+.PHONY: build test run fmt clippy
 
-# Build the tdb binary.
 build:
-	CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o tdb ./cmd/tdb
+	cargo build --release
 
-# Run the full test suite.
 test:
-	go test ./...
+	cargo test
 
-vet:
-	go vet ./...
+run:
+	cargo run -- --config $${HOME}/.config/tdb/tdb.enc
 
-# Fetch keyword/function/operator/command data from the upstream syntax
-# libraries (ace-autocompleter, redis-doc, monaco-sql-languages, apache/doris)
-# and write the normalized JSON into internal/suggest/data/. Requires network;
-# the generated files are committed, so normal builds/CI do NOT need this.
-syntax:
-	go run ./internal/suggest/gen
-	gofmt -w internal/suggest/data 2>/dev/null || true
+fmt:
+	cargo fmt
+
+clippy:
+	cargo clippy --all-targets -- -D warnings
