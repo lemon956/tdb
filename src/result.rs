@@ -39,6 +39,10 @@ pub struct Set {
     pub table: Option<Table>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub documents: Vec<Document>,
+    /// True when this result represents a document stream, even if it contains
+    /// zero documents. This distinguishes an empty Mongo result from scalar null.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub document_result: bool,
     #[serde(default, skip_serializing_if = "Value::is_null")]
     pub value: Value,
     pub has_more: bool,
@@ -99,7 +103,7 @@ impl Set {
                     .collect();
                 write_csv_record(w, &record)?;
             }
-        } else if !self.documents.is_empty() {
+        } else if self.document_result || !self.documents.is_empty() {
             write_csv_record(w, &["document".to_string()])?;
             for doc in &self.documents {
                 let raw = serde_json::to_string(&doc.data).unwrap_or_default();
@@ -130,7 +134,7 @@ impl Set {
                 })
                 .collect();
             Value::Array(rows)
-        } else if !self.documents.is_empty() {
+        } else if self.document_result || !self.documents.is_empty() {
             Value::Array(
                 self.documents
                     .iter()
@@ -214,6 +218,28 @@ mod tests {
         let out = String::from_utf8(buf).unwrap();
         assert!(out.contains("\"id\"") && out.contains("\"name\""), "{out}");
         assert!(out.contains("null"), "{out}");
+    }
+
+    #[test]
+    fn empty_document_result_exports_empty_json_array() {
+        let set = Set {
+            document_result: true,
+            ..Default::default()
+        };
+        let mut buf = Vec::new();
+        set.write_json(&mut buf).unwrap();
+        assert_eq!(String::from_utf8(buf).unwrap(), "[]\n");
+    }
+
+    #[test]
+    fn empty_document_result_exports_csv_header() {
+        let set = Set {
+            document_result: true,
+            ..Default::default()
+        };
+        let mut buf = Vec::new();
+        set.write_csv(&mut buf).unwrap();
+        assert_eq!(String::from_utf8(buf).unwrap(), "document\n");
     }
 
     #[test]

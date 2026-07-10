@@ -74,6 +74,18 @@ fn parse(raw: &str) -> Vec<Suggestion> {
 static MONGO_QUERY: Lazy<Vec<Suggestion>> = Lazy::new(|| parse(include_str!("data/mongo_query.json")));
 static MONGO_STAGE: Lazy<Vec<Suggestion>> = Lazy::new(|| parse(include_str!("data/mongo_stage.json")));
 static MONGO_EXPR: Lazy<Vec<Suggestion>> = Lazy::new(|| parse(include_str!("data/mongo_expr.json")));
+static MONGO_BSON_CONSTRUCTORS: Lazy<Vec<Suggestion>> = Lazy::new(|| {
+    [
+        ("ObjectId(", "BSON object id"),
+        ("ISODate(", "BSON date"),
+        ("NumberLong(", "BSON 64-bit integer"),
+        ("NumberDecimal(", "BSON decimal"),
+        ("NumberInt(", "BSON 32-bit integer"),
+    ]
+    .iter()
+    .map(|(value, detail)| Suggestion::new(value, detail))
+    .collect()
+});
 static REDIS_COMMANDS: Lazy<Vec<Suggestion>> = Lazy::new(|| parse(include_str!("data/redis.json")));
 static MYSQL_KEYWORDS: Lazy<Vec<Suggestion>> = Lazy::new(|| parse(include_str!("data/mysql_keywords.json")));
 static MYSQL_FUNCTIONS: Lazy<Vec<Suggestion>> = Lazy::new(|| parse(include_str!("data/mysql_functions.json")));
@@ -118,6 +130,8 @@ static MYSQL_FN_SET: Lazy<HashSet<String>> = Lazy::new(|| upper_fn_set(&MYSQL_FU
 static DORIS_FN_SET: Lazy<HashSet<String>> = Lazy::new(|| upper_fn_set(&DORIS_FUNCTIONS));
 static REDIS_CMD_SET: Lazy<HashSet<String>> = Lazy::new(|| upper_value_set(&REDIS_COMMANDS));
 static MONGO_METHOD_SET: Lazy<HashSet<String>> = Lazy::new(|| upper_value_set(&mongo_methods()));
+static MONGO_BSON_CONSTRUCTOR_SET: Lazy<HashSet<String>> =
+    Lazy::new(|| upper_fn_set(&MONGO_BSON_CONSTRUCTORS));
 
 /// Upper-case keyword set for an SQL driver (shared with the highlighter).
 pub fn sql_keyword_set(driver: Driver) -> &'static HashSet<String> {
@@ -139,6 +153,9 @@ pub fn redis_command_set() -> &'static HashSet<String> {
 }
 pub fn mongo_method_set() -> &'static HashSet<String> {
     &MONGO_METHOD_SET
+}
+pub(crate) fn mongo_bson_constructor_set() -> &'static HashSet<String> {
+    &MONGO_BSON_CONSTRUCTOR_SET
 }
 
 fn mongo_fragments() -> Vec<Suggestion> {
@@ -304,6 +321,12 @@ fn mongo_candidates(ctx: &Context, input: &str) -> Vec<Suggestion> {
         }
         let mut candidates = field_suggestions(&ctx.fields, "");
         candidates.extend(mongo_fragments());
+        candidates.extend(
+            MONGO_BSON_CONSTRUCTORS
+                .iter()
+                .filter(|item| item.value == "ObjectId(")
+                .cloned(),
+        );
         candidates.extend(MONGO_QUERY.clone());
         candidates.extend(mongo_update_operators());
         return candidates;
@@ -465,6 +488,15 @@ mod tests {
         let c = ctx(Driver::Mongo, "db.t.updateOne({_id:1}, { $");
         let s = suggest(&c);
         assert!(s.iter().any(|x| x.value == "$set"));
+    }
+
+    #[test]
+    fn mongo_only_suggests_object_id_constructor() {
+        let object_id = suggest(&ctx(Driver::Mongo, "db.users.find({_id: Obj"));
+        assert!(object_id.iter().any(|x| x.value == "ObjectId("));
+
+        let iso_date = suggest(&ctx(Driver::Mongo, "db.users.find({created_at: ISO"));
+        assert!(!iso_date.iter().any(|x| x.value == "ISODate("));
     }
 
     #[test]

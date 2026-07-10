@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use crate::ai::{self, Provider};
 
-use super::state::{AiMsg, App, Focus, TabKind};
+use super::state::{scope_key, AiMsg, App, Focus, TabKind};
 use super::task::AsyncMsg;
 use super::theme::StatusKind;
 
@@ -33,6 +33,9 @@ impl App {
         self.ai.open = true;
         self.previous_focus = self.focus;
         self.focus = Focus::Overlay;
+        // Preload the current database's tables so `@`-mention has candidates even
+        // if the user never expanded the database (mirrors Go's openAIChatModal).
+        self.ensure_current_objects_loaded();
     }
 
     pub fn close_ai(&mut self) {
@@ -52,6 +55,8 @@ impl App {
             return;
         }
         self.ai.input.clear();
+        self.ai.mention_items.clear();
+        self.ai.mention_index = 0;
         if let Some(cmd) = text.strip_prefix('/') {
             self.ai_slash(cmd);
             return;
@@ -111,6 +116,80 @@ impl App {
         }
     }
 
+    /// Refresh the `@`-mention completion popup from the current input. The
+    /// candidates are the current database's objects whose name contains the
+    /// trailing `@<prefix>`; no `@` token hides the popup.
+    pub fn ai_update_mention(&mut self) {
+        let Some(prefix) = ai_mention_prefix(&self.ai.input) else {
+            self.ai.mention_items.clear();
+            self.ai.mention_index = 0;
+            return;
+        };
+        let items: Vec<crate::suggest::Suggestion> = self
+            .active_session()
+            .map(|s| {
+                let key = scope_key(&s.current_catalog, &s.current_database);
+                s.nav
+                    .db_objects
+                    .get(&key)
+                    .map(|objs| {
+                        objs.iter()
+                            .filter(|o| prefix.is_empty() || o.name.to_lowercase().contains(&prefix))
+                            .take(20)
+                            .map(|o| crate::suggest::Suggestion {
+                                value: o.name.clone(),
+                                detail: object_type_label(o.type_).to_string(),
+                                ..Default::default()
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default()
+            })
+            .unwrap_or_default();
+        self.ai.mention_index = 0;
+        self.ai.mention_items = items;
+    }
+
+    pub fn ai_mention_move(&mut self, forward: bool) {
+        let n = self.ai.mention_items.len();
+        if n == 0 {
+            return;
+        }
+        self.ai.mention_index = if forward {
+            (self.ai.mention_index + 1) % n
+        } else {
+            (self.ai.mention_index + n - 1) % n
+        };
+    }
+
+    /// Accept the highlighted `@`-mention: replace the trailing `@<prefix>` with
+    /// `@<table> ` and prefetch that table's columns for the prompt schema.
+    pub fn accept_ai_mention(&mut self) {
+        let Some(item) = self.ai.mention_items.get(self.ai.mention_index).cloned() else {
+            return;
+        };
+        let at = mention_at_index(&self.ai.input);
+        let mut new_input = self.ai.input[..at].to_string();
+        new_input.push('@');
+        new_input.push_str(&item.value);
+        new_input.push(' ');
+        self.ai.input = new_input;
+        self.ai.mention_items.clear();
+        self.ai.mention_index = 0;
+        self.prefetch_table_fields(&item.value);
+    }
+
+    /// Kick off a background column fetch for `table` (cached in `field_cache`),
+    /// so the next prompt can include its schema.
+    fn prefetch_table_fields(&mut self, table: &str) {
+        let info = self.active_session().map(|s| {
+            (s.id, s.adapter.clone(), s.current_catalog.clone(), s.current_database.clone())
+        });
+        if let Some((sid, adapter, cat, db)) = info {
+            self.load_fields(sid, adapter, cat, db, table.to_string());
+        }
+    }
+
     /// Build a driver-aware prompt with conversation history and DB context.
     fn build_ai_prompt(&self, question: &str) -> String {
         let mut p = String::new();
@@ -125,6 +204,29 @@ impl App {
             }
             if !s.current_database.is_empty() {
                 p.push_str(&format!("Current database: {}. ", s.current_database));
+            }
+            // Available tables in the current scope.
+            let key = scope_key(&s.current_catalog, &s.current_database);
+            if let Some(objs) = s.nav.db_objects.get(&key) {
+                if !objs.is_empty() {
+                    let names: Vec<&str> = objs.iter().take(200).map(|o| o.name.as_str()).collect();
+                    p.push_str(&format!("Tables: {}. ", names.join(", ")));
+                }
+            }
+            // Schema of any @-mentioned tables (from cached columns).
+            let mut seen = std::collections::HashSet::new();
+            for tok in self.ai.messages.iter().filter(|m| m.role == "you").flat_map(|m| mention_tokens(&m.text)) {
+                let tl = tok.to_lowercase();
+                if !seen.insert(tl.clone()) {
+                    continue;
+                }
+                if let Some(fields) = s.field_cache.get(&tl) {
+                    if !fields.is_empty() {
+                        let cols: Vec<String> =
+                            fields.iter().map(|f| format!("{} {}", f.name, f.type_)).collect();
+                        p.push_str(&format!("Columns of {tok}: {}. ", cols.join(", ")));
+                    }
+                }
             }
         }
         p.push('\n');
@@ -183,5 +285,94 @@ impl App {
         }
         self.close_ai();
         self.set_status(StatusKind::Success, "SQL inserted");
+    }
+}
+
+fn object_type_label(t: crate::db::ObjectType) -> &'static str {
+    match t {
+        crate::db::ObjectType::Table => "table",
+        crate::db::ObjectType::View => "view",
+        crate::db::ObjectType::Collection => "collection",
+        crate::db::ObjectType::Key => "key",
+    }
+}
+
+/// True when `b` continues an identifier (table-name) token.
+fn is_ident_byte(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b == b'_' || b == b'$'
+}
+
+/// Byte index where the trailing identifier run starts (the char after it would
+/// be the `@`). Used to splice in an accepted mention.
+fn mention_at_index(input: &str) -> usize {
+    let bytes = input.as_bytes();
+    let mut i = input.len();
+    while i > 0 && is_ident_byte(bytes[i - 1]) {
+        i -= 1;
+    }
+    i.saturating_sub(1) // step over the '@'
+}
+
+/// Lowercased prefix when the input ends in an `@<word>` mention, else `None`.
+fn ai_mention_prefix(input: &str) -> Option<String> {
+    let bytes = input.as_bytes();
+    let mut i = input.len();
+    while i > 0 && is_ident_byte(bytes[i - 1]) {
+        i -= 1;
+    }
+    if i > 0 && bytes[i - 1] == b'@' {
+        Some(input[i..].to_lowercase())
+    } else {
+        None
+    }
+}
+
+/// All `@<word>` mention tokens in `text` (the `@` stripped).
+fn mention_tokens(text: &str) -> Vec<String> {
+    let bytes = text.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'@' {
+            let start = i + 1;
+            let mut j = start;
+            while j < bytes.len() && is_ident_byte(bytes[j]) {
+                j += 1;
+            }
+            if j > start {
+                out.push(text[start..j].to_string());
+            }
+            i = j;
+        } else {
+            i += 1;
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ai_mention_prefix, mention_at_index, mention_tokens};
+
+    #[test]
+    fn mention_prefix_detects_trailing_at_token() {
+        assert_eq!(ai_mention_prefix("show @Us"), Some("us".to_string()));
+        assert_eq!(ai_mention_prefix("show @"), Some("".to_string()));
+        assert_eq!(ai_mention_prefix("show users"), None);
+        assert_eq!(ai_mention_prefix("@orders x"), None); // not trailing
+    }
+
+    #[test]
+    fn mention_at_index_points_at_the_at_sign() {
+        // "ask @us" → '@' at byte 4.
+        assert_eq!(mention_at_index("ask @us"), 4);
+        // Bare trailing '@'.
+        assert_eq!(mention_at_index("ask @"), 4);
+    }
+
+    #[test]
+    fn mention_tokens_extracts_all() {
+        assert_eq!(mention_tokens("join @a and @b_2"), vec!["a".to_string(), "b_2".to_string()]);
+        assert!(mention_tokens("no mentions here").is_empty());
     }
 }

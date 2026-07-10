@@ -26,10 +26,14 @@ fn main() {
             uri_params: String::new(),
             read_only: false,
         },
-        "mysql" | "doris" => Profile {
+        "mysql" | "doris" | "mongo" => Profile {
             id: format!("local-{driver}"),
             name: format!("local-{driver}"),
-            driver: if driver == "doris" { Driver::Doris } else { Driver::Mysql },
+            driver: match driver {
+                "doris" => Driver::Doris,
+                "mongo" => Driver::Mongo,
+                _ => Driver::Mysql,
+            },
             host: a[4].clone(),
             port: a[5].parse().unwrap(),
             user: a[6].clone(),

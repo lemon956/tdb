@@ -4,13 +4,21 @@
 
 use std::sync::Arc;
 
+use crate::config::Driver;
 use crate::db::{Command, Page, Query, Scope, Target};
+use crate::validate::{self, Issue, Severity};
 
 use super::nav::{self, NavKind};
 use super::state::WorkspaceTab as WsTab;
 use super::state::{scope_key, App, Session, TabKind, WorkspaceTab};
 use super::task::AsyncMsg;
 use super::theme::StatusKind;
+
+fn blocking_query_issue(driver: Driver, text: &str) -> Option<Issue> {
+    validate::validate(driver, text)
+        .into_iter()
+        .find(|issue| issue.severity == Severity::Error)
+}
 
 impl App {
     /// Open (or focus) a connection by profile id.
@@ -187,6 +195,80 @@ impl App {
         }
     }
 
+    /// Jump-style navigation search: move the sidebar cursor to the next/prev
+    /// (dir = ±1) or first (dir = 0) node whose label matches `nav.search_query`,
+    /// auto-expanding the match's catalog/database. The tree is never filtered.
+    pub fn nav_search_jump(&mut self, dir: i32) {
+        let Some(s) = self.active_session() else { return };
+        let query = s.nav.search_query.to_lowercase();
+        if query.is_empty() {
+            return;
+        }
+        let conn = s.conn_label();
+        let matches = nav::search_matches(&s.nav, &conn, &query);
+        if matches.is_empty() {
+            self.set_status(StatusKind::Warning, "no match");
+            return;
+        }
+        let n = matches.len();
+        let idx = if dir == 0 {
+            0
+        } else {
+            (s.nav.search_match_index as i32 + dir).rem_euclid(n as i32) as usize
+        };
+        let target = matches[idx].clone();
+        let Some(s) = self.active_session_mut() else { return };
+        s.nav.search_match_index = idx;
+        // Auto-expand so the matched node is visible in the flattened tree.
+        match &target {
+            NavKind::Catalog { catalog } => {
+                s.nav.expanded_catalogs.insert(catalog.clone());
+            }
+            NavKind::Database { catalog, database } => {
+                if !catalog.is_empty() {
+                    s.nav.expanded_catalogs.insert(catalog.clone());
+                }
+                let _ = database;
+            }
+            NavKind::Object { catalog, database, .. } => {
+                if !catalog.is_empty() {
+                    s.nav.expanded_catalogs.insert(catalog.clone());
+                }
+                s.nav.expanded_dbs.insert(scope_key(catalog, database));
+            }
+            NavKind::Connection => {}
+        }
+        let nodes = nav::visible_nodes(&s.nav, &conn);
+        if let Some(pos) = nodes.iter().position(|nd| nd.kind == target) {
+            s.nav.cursor = pos;
+        }
+    }
+
+    /// Ensure the current database's objects are loaded so AI `@`-mention has
+    /// candidates even when the user has not expanded the database (mirrors Go's
+    /// `ensureQueryObjectsLoaded`). Loads asynchronously.
+    pub(crate) fn ensure_current_objects_loaded(&mut self) {
+        let info = {
+            let Some(s) = self.active_session() else { return };
+            if s.current_database.is_empty() {
+                return;
+            }
+            let key = scope_key(&s.current_catalog, &s.current_database);
+            if s.nav.db_objects.contains_key(&key) {
+                return;
+            }
+            (s.id, s.adapter.clone(), s.current_catalog.clone(), s.current_database.clone(), key)
+        };
+        let (sid, adapter, catalog, database, key) = info;
+        self.tasks.spawn_db("Loading objects", async move {
+            let objects = adapter
+                .list_objects(Scope { catalog, database, schema: String::new() })
+                .await
+                .unwrap_or_default();
+            AsyncMsg::Objects { session_id: sid, key, objects }
+        });
+    }
+
     fn open_table(
         &mut self,
         session_id: u64,
@@ -272,9 +354,17 @@ impl App {
 
     /// Run the active query tab's buffer.
     pub fn run_active_query(&mut self) {
+        let mut blocked = None;
         let info = {
-            let Some(s) = self.active_session() else { return };
-            let Some(tab) = s.active_tab() else { return };
+            let Some(s) = self.active_session_mut() else { return };
+            let sid = s.id;
+            let adapter = s.adapter.clone();
+            let catalog = s.current_catalog.clone();
+            let database = s.current_database.clone();
+            let profile_id = s.profile.id.clone();
+            let driver_kind = s.profile.driver;
+            let driver = driver_kind.as_str().to_string();
+            let Some(tab) = s.active_tab_mut() else { return };
             if tab.kind != TabKind::Query {
                 return;
             }
@@ -282,18 +372,40 @@ impl App {
             if text.trim().is_empty() {
                 return;
             }
-            (
-                s.id,
-                tab.id,
-                s.adapter.clone(),
-                s.current_catalog.clone(),
-                s.current_database.clone(),
-                s.profile.id.clone(),
-                s.profile.driver.as_str().to_string(),
-                text,
-            )
+            if let Some(issue) = blocking_query_issue(driver_kind, &text) {
+                tab.query_run_id = tab.query_run_id.wrapping_add(1);
+                tab.result = None;
+                tab.error = Some(issue.message.clone());
+                tab.view = Default::default();
+                tab.clear_result_search();
+                blocked = Some(issue.message);
+                None
+            } else {
+                tab.query_run_id = tab.query_run_id.wrapping_add(1);
+                let run_id = tab.query_run_id;
+                tab.result = None;
+                tab.error = None;
+                tab.view = Default::default();
+                tab.clear_result_search();
+                Some((
+                    sid,
+                    tab.id,
+                    run_id,
+                    adapter,
+                    catalog,
+                    database,
+                    profile_id,
+                    driver,
+                    text,
+                ))
+            }
         };
-        let (sid, tab_id, adapter, catalog, database, profile_id, driver, text) = info;
+        if let Some(message) = blocked {
+            self.set_status(StatusKind::Error, message);
+            return;
+        }
+        let Some(info) = info else { return };
+        let (sid, tab_id, run_id, adapter, catalog, database, profile_id, driver, text) = info;
         let stmt = text.clone();
         let db_for_msg = database.clone();
         self.tasks.spawn_db("Running query", async move {
@@ -308,6 +420,7 @@ impl App {
             AsyncMsg::QueryResult {
                 session_id: sid,
                 tab_id,
+                run_id,
                 statement: stmt,
                 profile_id,
                 driver,
@@ -362,8 +475,12 @@ impl App {
                 let row = tab.cursor_row;
                 let line = &tab.buffer[row];
                 let prefix: String = line.chars().take(tab.cursor_col).collect();
-                // Columns of the tables referenced in the FROM/JOIN clauses.
-                let tables = referenced_tables(&tab.buffer_text());
+                // Fields to offer: SQL columns of FROM/JOIN tables, or — for
+                // Mongo — the fields of collections referenced as `db.<coll>.`.
+                let mut tables = referenced_tables(&tab.buffer_text());
+                if s.profile.driver == crate::config::Driver::Mongo {
+                    tables.extend(referenced_collections(&tab.buffer_text()));
+                }
                 let mut fields = Vec::new();
                 let mut missing = Vec::new();
                 for t in &tables {
@@ -417,8 +534,9 @@ impl App {
         }
     }
 
-    /// Background fetch of a table's column names for editor completion.
-    fn load_fields(
+    /// Background fetch of a table's column names for editor completion and the
+    /// AI `@`-mention schema context.
+    pub(crate) fn load_fields(
         &mut self,
         session_id: u64,
         adapter: Arc<crate::db::Adapter>,
@@ -518,6 +636,37 @@ impl App {
             .unwrap_or(false)
     }
 
+    /// Populate the command-line (`:`) completion popup with the candidates whose
+    /// name prefixes the current token (Tab when the popup is hidden).
+    pub fn open_command_suggestions(&mut self) {
+        let token = crate::suggest::current_token(&self.command).to_lowercase();
+        self.command_completion = command_suggestions(&token);
+        self.command_completion_index = 0;
+    }
+
+    /// Cycle the command-completion highlight (Tab forward, Shift+Tab back).
+    pub fn command_completion_move(&mut self, forward: bool) {
+        let n = self.command_completion.len();
+        if n == 0 {
+            return;
+        }
+        self.command_completion_index = if forward {
+            (self.command_completion_index + 1) % n
+        } else {
+            (self.command_completion_index + n - 1) % n
+        };
+    }
+
+    /// Accept the highlighted command completion: replace the current token and
+    /// close the popup (the line stays open so arguments can follow).
+    pub fn accept_command_suggestion(&mut self) {
+        if let Some(item) = self.command_completion.get(self.command_completion_index) {
+            self.command = replace_last_token(&self.command, &item.value);
+        }
+        self.command_completion.clear();
+        self.command_completion_index = 0;
+    }
+
     fn record_history(
         &mut self,
         profile_id: String,
@@ -598,6 +747,8 @@ impl App {
         let Some(tab) = self.active_session_mut().and_then(|s| s.active_tab_mut()) else { return };
         let q = tab.result_search.to_lowercase();
         if q.is_empty() {
+            tab.result_search_total = 0;
+            tab.result_search_index = 0;
             return;
         }
         let Some(set) = &tab.result else { return };
@@ -606,9 +757,6 @@ impl App {
         } else {
             set.documents.len()
         };
-        if n == 0 {
-            return;
-        }
         let row_matches = |i: usize| -> bool {
             if let Some(t) = &set.table {
                 (0..t.columns.len()).any(|c| t.cell_string(i, c).to_lowercase().contains(&q))
@@ -621,18 +769,29 @@ impl App {
                 false
             }
         };
-        let start = tab.view.selected_row as i32;
-        let found = if dir == 0 {
-            (0..n).find(|&i| row_matches(i))
-        } else {
-            (1..=n as i32)
-                .map(|step| (start + dir * step).rem_euclid(n as i32) as usize)
-                .find(|&i| row_matches(i))
-        };
-        if let Some(i) = found {
-            tab.view.selected_row = i;
-            tab.view.row_offset = i;
+        // Match list (ascending row order) drives both navigation and the N/M
+        // counter shown in the title bar.
+        let matches: Vec<usize> = (0..n).filter(|&i| row_matches(i)).collect();
+        tab.result_search_total = matches.len();
+        if matches.is_empty() {
+            tab.result_search_index = 0;
+            return;
         }
+        let cur = tab.view.selected_row;
+        let target = if dir == 0 {
+            // Incremental typing: jump to the first match at or after the cursor,
+            // else wrap to the first match.
+            matches.iter().copied().find(|&i| i >= cur).unwrap_or(matches[0])
+        } else if dir > 0 {
+            // n: first match strictly after the cursor, wrapping around.
+            matches.iter().copied().find(|&i| i > cur).unwrap_or(matches[0])
+        } else {
+            // N: last match strictly before the cursor, wrapping around.
+            matches.iter().rev().copied().find(|&i| i < cur).unwrap_or(matches[matches.len() - 1])
+        };
+        // Move the cursor; the renderer scrolls the matched row into view.
+        tab.view.selected_row = target;
+        tab.result_search_index = matches.iter().position(|&i| i == target).map_or(0, |p| p + 1);
     }
 
     /// Extract the rectangular text region between two frame cells and copy it
@@ -713,6 +872,80 @@ impl App {
         }
     }
 
+    /// Copy the selected row(s) to the clipboard as TSV (all columns). For
+    /// document results, copies the selected documents' JSON.
+    pub fn copy_result_rows(&mut self) {
+        let text = {
+            let Some(tab) = self.active_session().and_then(|s| s.active_tab()) else { return };
+            let Some(set) = &tab.result else { return };
+            let (r0, r1) = tab.view.selection_rows();
+            if let Some(table) = &set.table {
+                if table.rows.is_empty() || table.columns.is_empty() {
+                    return;
+                }
+                let rmax = table.rows.len() - 1;
+                let ncols = table.columns.len();
+                let lines: Vec<String> = (r0..=r1.min(rmax))
+                    .map(|r| {
+                        (0..ncols)
+                            .map(|c| table.cell_string(r, c))
+                            .collect::<Vec<_>>()
+                            .join("\t")
+                    })
+                    .collect();
+                lines.join("\n")
+            } else if !set.documents.is_empty() {
+                let rmax = set.documents.len() - 1;
+                (r0..=r1.min(rmax))
+                    .filter_map(|r| set.documents.get(r))
+                    .map(|d| serde_json::to_string_pretty(&d.data).unwrap_or_default())
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            } else {
+                return;
+            }
+        };
+        if text.is_empty() {
+            return;
+        }
+        match super::clipboard::copy(&text) {
+            Ok(_) => self.set_status(StatusKind::Success, "copied to clipboard"),
+            Err(e) => self.set_status(StatusKind::Error, e),
+        }
+        if let Some(t) = self.active_session_mut().and_then(|s| s.active_tab_mut()) {
+            t.view.visual = None;
+        }
+    }
+
+    /// Copy the vim text pane's selection (char/line-wise) to the clipboard.
+    /// With no active selection, copies the current line (yy-like).
+    pub fn copy_text_selection(&mut self) {
+        let text = {
+            let Some(tab) = self.active_session().and_then(|s| s.active_tab()) else { return };
+            let lines = super::ui::pane_lines(tab);
+            if lines.is_empty() {
+                return;
+            }
+            let tc = &tab.view.text;
+            let (sl, el) = tc.selection().map(|(sl, _, el, _)| (sl, el)).unwrap_or((tc.line, tc.line));
+            (sl..=el.min(lines.len() - 1))
+                .map(|li| {
+                    let chars: Vec<char> = lines[li].chars().collect();
+                    let (s, e) = tc.sel_span_on(li, chars.len()).unwrap_or((0, chars.len()));
+                    chars[s.min(chars.len())..e.min(chars.len())].iter().collect::<String>()
+                })
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+        match super::clipboard::copy(&text) {
+            Ok(_) => self.set_status(StatusKind::Success, "copied to clipboard"),
+            Err(e) => self.set_status(StatusKind::Error, e),
+        }
+        if let Some(t) = self.active_session_mut().and_then(|s| s.active_tab_mut()) {
+            t.view.text.visual = None;
+        }
+    }
+
     /// Apply a typed async result to state.
     pub fn apply_async(&mut self, msg: AsyncMsg) {
         match msg {
@@ -774,6 +1007,7 @@ impl App {
                                 tab.preview_has_more = set.has_more;
                                 tab.error = None;
                                 tab.view = Default::default();
+                                tab.clear_result_search();
                                 tab.result = Some(set);
                             }
                             Err(e) => tab.error = Some(e),
@@ -781,27 +1015,32 @@ impl App {
                     }
                 }
             }
-            AsyncMsg::QueryResult { session_id, tab_id, statement, profile_id, driver, database, result } => {
+            AsyncMsg::QueryResult {
+                session_id,
+                tab_id,
+                run_id,
+                statement,
+                profile_id,
+                driver,
+                database,
+                result,
+            } => {
                 self.tasks.finish();
                 let ok = result.is_ok();
                 let err_text = result.as_ref().err().cloned().unwrap_or_default();
+                let mut applied = false;
                 if let Some(s) = self.session_by_id(session_id) {
                     if let Some(tab) = s.tabs.iter_mut().find(|t| t.id == tab_id) {
-                        match result {
-                            Ok(set) => {
-                                tab.error = None;
-                                tab.view = Default::default();
-                                tab.result = Some(set);
-                            }
-                            Err(e) => tab.error = Some(e),
-                        }
+                        applied = apply_query_result(tab, run_id, result);
                     }
                 }
-                self.record_history(profile_id, driver, database, statement, ok, err_text);
-                if ok {
-                    self.set_status(StatusKind::Success, "query done");
-                } else {
-                    self.set_status(StatusKind::Error, "query failed");
+                if applied {
+                    self.record_history(profile_id, driver, database, statement, ok, err_text);
+                    if ok {
+                        self.set_status(StatusKind::Success, "query done");
+                    } else {
+                        self.set_status(StatusKind::Error, "query failed");
+                    }
                 }
             }
             AsyncMsg::TestResult { profile_name, result } => {
@@ -869,6 +1108,26 @@ fn apply_completion(tab: &mut WsTab, row: usize, start: usize, item: &str) {
     tab.cursor_col = start + item.chars().count();
 }
 
+fn apply_query_result(
+    tab: &mut WorkspaceTab,
+    run_id: u64,
+    result: Result<crate::result::Set, String>,
+) -> bool {
+    if run_id != tab.query_run_id {
+        return false;
+    }
+    match result {
+        Ok(set) => {
+            tab.error = None;
+            tab.view = Default::default();
+            tab.clear_result_search();
+            tab.result = Some(set);
+        }
+        Err(e) => tab.error = Some(e),
+    }
+    true
+}
+
 /// Box-drawing / block glyphs (frames, scrollbars) that should be stripped from
 /// a copied selection so only real content survives.
 fn is_box_drawing(ch: char) -> bool {
@@ -916,6 +1175,104 @@ mod selection_tests {
         let lines = vec!["abcdef".to_string()];
         assert_eq!(extract_selection(&lines, (1, 0), (3, 0)), "bcd");
     }
+}
+
+#[cfg(test)]
+mod query_result_tests {
+    use super::{apply_query_result, blocking_query_issue};
+    use crate::app::state::WorkspaceTab;
+    use crate::config::Driver;
+    use crate::result::{Column, Row, Set, Table};
+    use crate::validate::Severity;
+    use serde_json::json;
+
+    fn one_cell_set(value: i64) -> Set {
+        Set {
+            table: Some(Table {
+                columns: vec![Column {
+                    name: "value".into(),
+                    type_: String::new(),
+                }],
+                rows: vec![Row {
+                    values: vec![json!(value)],
+                }],
+            }),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn stale_query_result_does_not_replace_current_tab_result() {
+        let mut tab = WorkspaceTab::query(1);
+        tab.query_run_id = 2;
+        tab.result = Some(one_cell_set(2));
+
+        let applied = apply_query_result(&mut tab, 1, Ok(one_cell_set(1)));
+
+        assert!(!applied, "stale query result should be ignored");
+        let table = tab.result.as_ref().and_then(|s| s.table.as_ref()).unwrap();
+        assert_eq!(table.cell_string(0, 0), "2");
+    }
+
+    #[test]
+    fn mongo_validation_errors_are_blocking_query_issues() {
+        let issue = blocking_query_issue(Driver::Mongo, r#"db.users.find({profile.name: "Ada"})"#).unwrap();
+
+        assert_eq!(issue.severity, Severity::Error);
+        assert!(issue.message.contains("profile.name"));
+        assert!(blocking_query_issue(Driver::Mysql, "select 1").is_none());
+    }
+}
+
+/// Command-line (`:`) completion candidates: only commands `run_command`
+/// actually handles, so accepting one never yields "unknown command".
+const COMMAND_SUGGESTIONS: &[(&str, &str)] = &[
+    ("help", "open help"),
+    ("new", "create connection"),
+    ("edit", "edit connection"),
+    ("delete", "delete selected item"),
+    ("open", "open connection or object"),
+    ("test", "test connection"),
+    ("connections", "show connections"),
+    ("query", "create query tab"),
+    ("history", "show history"),
+    ("refresh", "refresh active view"),
+    ("back", "go back"),
+    ("next", "next page"),
+    ("prev", "previous page"),
+    ("export", "export result: csv|json [path]"),
+    ("copy", "copy result: csv|json"),
+    ("timeout", "query timeout seconds"),
+    ("q", "quit"),
+];
+
+/// Command candidates whose name prefixes `token` (lowercased), capped at 5.
+/// Pure → unit-testable without an `App`.
+fn command_suggestions(token: &str) -> Vec<crate::suggest::Suggestion> {
+    COMMAND_SUGGESTIONS
+        .iter()
+        .filter(|(value, _)| token.is_empty() || value.starts_with(token))
+        .take(5)
+        .map(|(value, detail)| crate::suggest::Suggestion {
+            value: value.to_string(),
+            detail: detail.to_string(),
+            ..Default::default()
+        })
+        .collect()
+}
+
+/// Replace the identifier run at the end of `s` with `value`. When `s` ends in
+/// whitespace (empty token) the value is appended. Mirrors Go's
+/// `replaceCurrentToken` for the single-line, cursor-at-end command input.
+fn replace_last_token(s: &str, value: &str) -> String {
+    let start = s
+        .char_indices()
+        .rev()
+        .take_while(|(_, c)| c.is_ascii_alphanumeric() || *c == '_' || *c == '$')
+        .last()
+        .map(|(i, _)| i)
+        .unwrap_or(s.len());
+    format!("{}{}", &s[..start], value)
 }
 
 /// Compute live completion candidates for the text `prefix` before the cursor.
@@ -966,4 +1323,50 @@ fn referenced_tables(sql: &str) -> Vec<String> {
         }
     }
     out
+}
+
+static MONGO_COLL_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\bdb\.([A-Za-z_][\w$]*)\.").unwrap());
+
+/// Collection names referenced as `db.<collection>.` in a mongosh command, so
+/// their fields can be preloaded for `find({<field>` completion.
+fn referenced_collections(text: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    for c in MONGO_COLL_RE.captures_iter(text) {
+        let name = c[1].to_string();
+        if !out.contains(&name) {
+            out.push(name);
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod command_completion_tests {
+    use super::{command_suggestions, replace_last_token};
+
+    #[test]
+    fn suggestions_filter_by_prefix() {
+        let ex = command_suggestions("ex");
+        assert!(ex.iter().any(|s| s.value == "export"));
+        assert!(!ex.iter().any(|s| s.value == "edit"));
+
+        // Newly wired commands are reachable by prefix.
+        assert!(command_suggestions("con").iter().any(|s| s.value == "connections"));
+        assert!(command_suggestions("q").iter().any(|s| s.value == "q"));
+
+        // Empty token lists candidates (capped at 5).
+        let all = command_suggestions("");
+        assert!(!all.is_empty() && all.len() <= 5);
+
+        // No match yields an empty list.
+        assert!(command_suggestions("zzz").is_empty());
+    }
+
+    #[test]
+    fn replace_last_token_swaps_or_appends() {
+        assert_eq!(replace_last_token("exp", "export"), "export");
+        assert_eq!(replace_last_token("", "help"), "help");
+        // Cursor after whitespace: append a second word instead of replacing.
+        assert_eq!(replace_last_token("export c", "copy"), "export copy");
+    }
 }

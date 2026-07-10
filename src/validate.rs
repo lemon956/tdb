@@ -77,6 +77,14 @@ fn validate_mongo(text: &str) -> Vec<Issue> {
             }];
         }
     }
+    if let Err(err) = crate::db::mongo::parse_mongosh_command(trimmed) {
+        return vec![Issue {
+            offset: text.find(trimmed).unwrap_or(0),
+            length: trimmed.len().max(1),
+            severity: Severity::Error,
+            message: format!("mongo: {err}"),
+        }];
+    }
     Vec::new()
 }
 
@@ -174,5 +182,20 @@ mod tests {
     fn mongo_unknown_method_warns() {
         let issues = validate(Driver::Mongo, "db.users.frobnicate({})");
         assert!(issues.iter().any(|i| i.message.contains("unknown method")));
+    }
+
+    #[test]
+    fn mongo_malformed_filter_is_error() {
+        let issues = validate(Driver::Mongo, r#"db.users.find({profile.name: "Ada"})"#);
+
+        assert_eq!(issues[0].severity, Severity::Error);
+        assert!(issues[0].message.contains("profile.name"));
+    }
+
+    #[test]
+    fn mongo_quoted_dotted_filter_is_ok() {
+        let issues = validate(Driver::Mongo, r#"db.users.find({"profile.name": "Ada"})"#);
+
+        assert!(issues.is_empty(), "{issues:?}");
     }
 }

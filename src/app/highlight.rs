@@ -42,7 +42,12 @@ pub fn highlight_classes(driver: Option<Driver>, text: &str) -> Vec<SynClass> {
             highlight_sql(text, suggest::sql_keyword_set(d), suggest::sql_function_set(d), &mut cls);
         }
         Some(Driver::Redis) => highlight_redis(text, suggest::redis_command_set(), &mut cls),
-        Some(Driver::Mongo) => highlight_mongo(text, suggest::mongo_method_set(), &mut cls),
+        Some(Driver::Mongo) => highlight_mongo(
+            text,
+            suggest::mongo_method_set(),
+            suggest::mongo_bson_constructor_set(),
+            &mut cls,
+        ),
         None => {}
     }
     cls
@@ -156,7 +161,12 @@ fn highlight_sql(text: &str, keywords: &std::collections::HashSet<String>, funct
     }
 }
 
-fn highlight_mongo(text: &str, methods: &std::collections::HashSet<String>, cls: &mut [SynClass]) {
+fn highlight_mongo(
+    text: &str,
+    methods: &std::collections::HashSet<String>,
+    constructors: &std::collections::HashSet<String>,
+    cls: &mut [SynClass],
+) {
     let t = text.as_bytes();
     let mut i = 0;
     while i < t.len() {
@@ -189,7 +199,8 @@ fn highlight_mongo(text: &str, methods: &std::collections::HashSet<String>, cls:
             while j < t.len() && is_ident_byte(t[j]) {
                 j += 1;
             }
-            if methods.contains(&text[i..j].to_uppercase()) {
+            let word = text[i..j].to_uppercase();
+            if methods.contains(&word) || constructors.contains(&word) {
                 fill(cls, i, j, SynClass::Fn);
             }
             i = j;
@@ -295,6 +306,18 @@ fn style_for(c: SynClass) -> Option<Style> {
     Some(s)
 }
 
+/// Per-character base [`Style`] for a JSON line — the foreground colors the vim
+/// text pane overlays its cursor / selection on top of. One entry per `char`.
+pub fn json_base_styles(line: &str) -> Vec<Style> {
+    let classes = highlight_json_classes(line);
+    line.char_indices()
+        .map(|(b, _)| {
+            style_for(classes.get(b).copied().unwrap_or(SynClass::Plain))
+                .unwrap_or_else(|| Style::default().fg(theme::INK))
+        })
+        .collect()
+}
+
 /// Build styled spans for one line of `text` given its per-byte classes,
 /// grouping consecutive same-class bytes and snapping to char boundaries.
 pub fn spans_for_line(text: &str, classes: &[SynClass]) -> Vec<Span<'static>> {
@@ -355,6 +378,33 @@ mod tests {
         assert_eq!(c[text.find("$gt").unwrap()], SynClass::Var);
         assert_eq!(c[text.find("find").unwrap()], SynClass::Fn);
         assert_eq!(c[text.find('5').unwrap()], SynClass::Num);
+    }
+
+    #[test]
+    fn mongo_bson_constructor_highlighting_is_precise() {
+        let text = concat!(
+            "db.t.find({_id: ObjectId(\"64b7f0000000000000000001\"), ",
+            "at: ISODate(\"2026-07-10T00:00:00Z\"), ",
+            "long: NumberLong(\"1\"), decimal: NumberDecimal(\"1.5\"), ",
+            "int: NumberInt(1), bad: Bogus(\"x\")})"
+        );
+        let c = classes(Driver::Mongo, text);
+
+        for name in [
+            "ObjectId",
+            "ISODate",
+            "NumberLong",
+            "NumberDecimal",
+            "NumberInt",
+        ] {
+            assert_eq!(c[text.find(name).unwrap()], SynClass::Fn, "{name}");
+        }
+        let object_id = text.find("ObjectId").unwrap();
+        assert_eq!(c[object_id + "ObjectId".len()], SynClass::Pun);
+        assert_eq!(c[object_id + "ObjectId(".len()], SynClass::Str);
+        let number_int = text.find("NumberInt(1").unwrap();
+        assert_eq!(c[number_int + "NumberInt(".len()], SynClass::Num);
+        assert_eq!(c[text.find("Bogus").unwrap()], SynClass::Plain);
     }
 
     #[test]

@@ -194,6 +194,17 @@ mod tests {
     }
 
     #[test]
+    fn live_completion_suggests_mongo_object_id_constructor() {
+        let items = super::actions::live_completion_items(
+            Driver::Mongo,
+            &[],
+            &[],
+            "db.users.find({_id: Obj",
+        );
+        assert!(items.iter().any(|s| s == "ObjectId("), "{items:?}");
+    }
+
+    #[test]
     fn command_bar_shows_input() {
         // Reported bug #1: typing after `:` must be visible.
         let mut app = test_app();

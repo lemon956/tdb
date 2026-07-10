@@ -40,12 +40,13 @@ impl MongoAdapter {
         self.client
             .database("admin")
             .run_command(doc! {"ping": 1})
-            .await?;
+            .await
+            .map_err(mongo_err)?;
         Ok(())
     }
 
     pub async fn list_databases(&self) -> Result<Vec<String>> {
-        Ok(self.client.list_database_names().await?)
+        self.client.list_database_names().await.map_err(mongo_err)
     }
 
     pub async fn list_objects(&self, scope: Scope) -> Result<Vec<Object>> {
@@ -53,7 +54,8 @@ impl MongoAdapter {
             .client
             .database(&scope.database)
             .list_collection_names()
-            .await?;
+            .await
+            .map_err(mongo_err)?;
         Ok(names
             .into_iter()
             .map(|name| Object {
@@ -80,7 +82,8 @@ impl MongoAdapter {
             .find(filter)
             .limit(find_limit)
             .skip(page.offset.max(0) as u64)
-            .await?;
+            .await
+            .map_err(mongo_err)?;
         let mut set = cursor_to_set(cursor, page.limit as usize).await?;
         set.has_more = set.truncated;
         set.truncated = false;
@@ -147,8 +150,9 @@ impl MongoAdapter {
     }
 
     pub async fn execute(&self, command: Command) -> Result<Set> {
-        if let Ok(shell) = parse_mongosh_command(&command.text) {
-            return self.execute_mongosh(&command, shell).await;
+        match classify_execute_text(&command.text)? {
+            MongoExecuteText::Mongosh(shell) => return self.execute_mongosh(&command, shell).await,
+            MongoExecuteText::JsonRequest => {}
         }
         // JSON request form: {database, collection, filter, limit, skip}
         let req: Value = serde_json::from_str(&command.text)?;
@@ -219,7 +223,10 @@ impl MongoAdapter {
                 .await
             }
             "countDocuments" => {
-                let count = coll.count_documents(value_to_doc(&shell.filter)).await?;
+                let count = coll
+                    .count_documents(value_to_doc(&shell.filter)?)
+                    .await
+                    .map_err(mongo_err)?;
                 Ok(Set {
                     table: Some(result::Table {
                         columns: vec![result::Column {
@@ -238,8 +245,8 @@ impl MongoAdapter {
                     .pipeline
                     .iter()
                     .map(|v| value_to_doc(&Some(v.as_object().cloned().unwrap_or_default())))
-                    .collect();
-                let cursor = coll.aggregate(pipeline).await?;
+                    .collect::<Result<Vec<_>>>()?;
+                let cursor = coll.aggregate(pipeline).await.map_err(mongo_err)?;
                 cursor_to_set(cursor, crate::db::MAX_RESULT_ROWS).await
             }
             _ => self.execute_mongosh_mutation(&coll, shell).await,
@@ -254,7 +261,7 @@ impl MongoAdapter {
         self.ensure_writable()?;
         let affected: i64 = match shell.method.as_str() {
             "insertOne" => {
-                coll.insert_one(value_to_doc(&shell.document)).await?;
+                coll.insert_one(value_to_doc(&shell.document)?).await.map_err(mongo_err)?;
                 1
             }
             "insertMany" => {
@@ -262,25 +269,34 @@ impl MongoAdapter {
                     .documents
                     .iter()
                     .map(|v| value_to_doc(&v.as_object().cloned()))
-                    .collect();
-                let res = coll.insert_many(docs).await?;
+                    .collect::<Result<Vec<_>>>()?;
+                let res = coll.insert_many(docs).await.map_err(mongo_err)?;
                 res.inserted_ids.len() as i64
             }
             "updateOne" => {
                 let res = coll
-                    .update_one(value_to_doc(&shell.filter), value_to_doc(&shell.update))
-                    .await?;
+                    .update_one(value_to_doc(&shell.filter)?, value_to_doc(&shell.update)?)
+                    .await
+                    .map_err(mongo_err)?;
                 res.modified_count as i64
             }
             "updateMany" => {
                 let res = coll
-                    .update_many(value_to_doc(&shell.filter), value_to_doc(&shell.update))
-                    .await?;
+                    .update_many(value_to_doc(&shell.filter)?, value_to_doc(&shell.update)?)
+                    .await
+                    .map_err(mongo_err)?;
                 res.modified_count as i64
             }
-            "deleteOne" => coll.delete_one(value_to_doc(&shell.filter)).await?.deleted_count as i64,
+            "deleteOne" => coll
+                .delete_one(value_to_doc(&shell.filter)?)
+                .await
+                .map_err(mongo_err)?
+                .deleted_count as i64,
             "deleteMany" => {
-                coll.delete_many(value_to_doc(&shell.filter)).await?.deleted_count as i64
+                coll.delete_many(value_to_doc(&shell.filter)?)
+                    .await
+                    .map_err(mongo_err)?
+                    .deleted_count as i64
             }
             _ => return Err(anyhow!("mongo execute requires database and collection")),
         };
@@ -290,8 +306,9 @@ impl MongoAdapter {
     pub async fn insert(&self, target: Target, values: Map<String, Value>) -> Result<MutationResult> {
         self.ensure_writable()?;
         self.coll(&target.database, &target.name)
-            .insert_one(value_to_doc(&Some(values)))
-            .await?;
+            .insert_one(value_to_doc(&Some(values))?)
+            .await
+            .map_err(mongo_err)?;
         Ok(result::new_mutation_result(1))
     }
 
@@ -303,11 +320,12 @@ impl MongoAdapter {
     ) -> Result<MutationResult> {
         self.ensure_writable()?;
         let filter = id_filter(&key)?;
-        let update = doc! { "$set": value_to_doc(&Some(values)) };
+        let update = doc! { "$set": value_to_doc(&Some(values))? };
         let res = self
             .coll(&target.database, &target.name)
             .update_one(filter, update)
-            .await?;
+            .await
+            .map_err(mongo_err)?;
         Ok(result::new_mutation_result(res.modified_count as i64))
     }
 
@@ -317,7 +335,8 @@ impl MongoAdapter {
         let res = self
             .coll(&target.database, &target.name)
             .delete_one(filter)
-            .await?;
+            .await
+            .map_err(mongo_err)?;
         Ok(result::new_mutation_result(res.deleted_count as i64))
     }
 
@@ -327,6 +346,13 @@ impl MongoAdapter {
         }
         Ok(())
     }
+}
+
+/// mongodb's `Error` Display appends the raw BSON server reply
+/// (`server response: Some(RawDocumentBuf …)`); keep only the human-readable
+/// `kind` so the UI error box shows a clean message instead of a hex dump.
+fn mongo_err(e: mongodb::error::Error) -> anyhow::Error {
+    anyhow!("{}", e.kind)
 }
 
 async fn cursor_to_set(
@@ -340,7 +366,7 @@ async fn cursor_to_set(
     };
     let mut docs = Vec::new();
     let mut truncated = false;
-    while let Some(doc) = cursor.try_next().await? {
+    while let Some(doc) = cursor.try_next().await.map_err(mongo_err)? {
         if docs.len() >= limit {
             truncated = true;
             break;
@@ -367,6 +393,7 @@ fn docs_to_set(docs: &[Document]) -> Set {
     }
     Set {
         documents: out,
+        document_result: true,
         ..Default::default()
     }
 }
@@ -496,14 +523,14 @@ fn urlencode(s: &str) -> String {
 
 fn build_filter(query: &Query) -> Result<Document> {
     if let Some(filter) = &query.filter {
-        return Ok(value_to_doc(&Some(filter.clone())));
+        return value_to_doc(&Some(filter.clone()));
     }
     if query.text.trim().is_empty() {
         return Ok(Document::new());
     }
     let v: Value = serde_json::from_str(&query.text)
         .map_err(|e| anyhow!("parse mongo filter json: {e}"))?;
-    Ok(value_to_doc(&v.as_object().cloned()))
+    value_to_doc(&v.as_object().cloned())
 }
 
 fn id_filter(key: &Key) -> Result<Document> {
@@ -523,27 +550,31 @@ fn id_filter(key: &Key) -> Result<Document> {
         return Ok(doc! {"_id": text});
     }
     match id {
-        Some(v) => Ok(doc! {"_id": json_to_bson(&v)}),
+        Some(v) => Ok(doc! {"_id": json_to_bson(&v)?}),
         None => Err(anyhow!("mongo write operation requires _id")),
     }
 }
 
 /// Convert a JSON object (already Extended-JSON-normalized) into a BSON document,
-/// interpreting `$oid`/`$date`/etc.
-fn value_to_doc(v: &Option<Map<String, Value>>) -> Document {
+/// interpreting `$oid`/`$date`/etc. Returns an empty document for `None`.
+///
+/// Errors are propagated (not swallowed): a filter/document that fails Extended
+/// JSON conversion — e.g. an invalid `ObjectId` — must surface as an error, never
+/// silently collapse to `{}` (which would make `find` match the whole collection).
+fn value_to_doc(v: &Option<Map<String, Value>>) -> Result<Document> {
     match v {
-        Some(m) => match json_to_bson(&Value::Object(m.clone())) {
-            Bson::Document(d) => d,
-            _ => Document::new(),
+        Some(m) => match json_to_bson(&Value::Object(m.clone()))? {
+            Bson::Document(d) => Ok(d),
+            _ => Err(anyhow!("mongo filter/document must be an object")),
         },
-        None => Document::new(),
+        None => Ok(Document::new()),
     }
 }
 
-fn json_to_bson(v: &Value) -> Bson {
+fn json_to_bson(v: &Value) -> Result<Bson> {
     // bson's TryFrom<serde_json::Value> interprets MongoDB Extended JSON
-    // ($oid, $date, $numberLong, ...).
-    Bson::try_from(v.clone()).unwrap_or(Bson::Null)
+    // ($oid, $date, $numberLong, ...) and recurses into nested objects/arrays.
+    Bson::try_from(v.clone()).map_err(|e| anyhow!("invalid extended JSON: {e}"))
 }
 
 // ---- mongosh command parser (pure, tested) ----
@@ -558,6 +589,19 @@ pub struct MongoshCommand {
     pub documents: Vec<Value>,
     pub pipeline: Vec<Value>,
     pub limit: i32,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+enum MongoExecuteText {
+    Mongosh(MongoshCommand),
+    JsonRequest,
+}
+
+fn classify_execute_text(text: &str) -> Result<MongoExecuteText> {
+    if text.trim().starts_with("db.") {
+        return parse_mongosh_command(text).map(MongoExecuteText::Mongosh);
+    }
+    Ok(MongoExecuteText::JsonRequest)
 }
 
 pub fn parse_mongosh_command(text: &str) -> Result<MongoshCommand> {
@@ -589,20 +633,20 @@ pub fn parse_mongosh_command(text: &str) -> Result<MongoshCommand> {
         ..Default::default()
     };
     match method.as_str() {
-        "find" => command.filter = Some(parse_map_arg(&args, 0)),
+        "find" => command.filter = Some(parse_optional_map_arg(&args, 0)?),
         "findOne" => {
-            command.filter = Some(parse_map_arg(&args, 0));
+            command.filter = Some(parse_optional_map_arg(&args, 0)?);
             command.limit = 1;
         }
-        "countDocuments" => command.filter = Some(parse_map_arg(&args, 0)),
-        "aggregate" => command.pipeline = parse_array_arg(&args, 0),
-        "insertOne" => command.document = Some(parse_map_arg(&args, 0)),
-        "insertMany" => command.documents = parse_array_arg(&args, 0),
+        "countDocuments" => command.filter = Some(parse_optional_map_arg(&args, 0)?),
+        "aggregate" => command.pipeline = parse_optional_array_arg(&args, 0)?,
+        "insertOne" => command.document = Some(parse_required_map_arg(&args, 0)?),
+        "insertMany" => command.documents = parse_required_array_arg(&args, 0)?,
         "updateOne" | "updateMany" => {
-            command.filter = Some(parse_map_arg(&args, 0));
-            command.update = Some(parse_map_arg(&args, 1));
+            command.filter = Some(parse_required_map_arg(&args, 0)?);
+            command.update = Some(parse_required_map_arg(&args, 1)?);
         }
-        "deleteOne" | "deleteMany" => command.filter = Some(parse_map_arg(&args, 0)),
+        "deleteOne" | "deleteMany" => command.filter = Some(parse_required_map_arg(&args, 0)?),
         _ => return Err(anyhow!("not a mongosh command")),
     }
     Ok(command)
@@ -642,29 +686,39 @@ fn split_mongosh_args(text: &str) -> Vec<String> {
     args
 }
 
-fn parse_map_arg(args: &[String], index: usize) -> Map<String, Value> {
-    let Some(arg) = args.get(index) else {
-        return Map::new();
-    };
-    if arg.trim().is_empty() {
-        return Map::new();
-    }
-    match parse_mongosh_value(arg) {
-        Some(Value::Object(m)) => m,
-        _ => Map::new(),
+fn parse_optional_map_arg(args: &[String], index: usize) -> Result<Map<String, Value>> {
+    match args.get(index) {
+        Some(arg) if !arg.trim().is_empty() => parse_required_map_arg(args, index),
+        _ => Ok(Map::new()),
     }
 }
 
-fn parse_array_arg(args: &[String], index: usize) -> Vec<Value> {
-    let Some(arg) = args.get(index) else {
-        return Vec::new();
-    };
-    if arg.trim().is_empty() {
-        return Vec::new();
+fn parse_required_map_arg(args: &[String], index: usize) -> Result<Map<String, Value>> {
+    let arg = args
+        .get(index)
+        .filter(|arg| !arg.trim().is_empty())
+        .ok_or_else(|| anyhow!("mongo argument {} must be an object", index + 1))?;
+    match parse_mongosh_value(arg)? {
+        Value::Object(m) => Ok(m),
+        _ => Err(anyhow!("mongo argument {} must be an object", index + 1)),
     }
-    match parse_mongosh_value(arg) {
-        Some(Value::Array(a)) => a,
-        _ => Vec::new(),
+}
+
+fn parse_optional_array_arg(args: &[String], index: usize) -> Result<Vec<Value>> {
+    match args.get(index) {
+        Some(arg) if !arg.trim().is_empty() => parse_required_array_arg(args, index),
+        _ => Ok(Vec::new()),
+    }
+}
+
+fn parse_required_array_arg(args: &[String], index: usize) -> Result<Vec<Value>> {
+    let arg = args
+        .get(index)
+        .filter(|arg| !arg.trim().is_empty())
+        .ok_or_else(|| anyhow!("mongo argument {} must be an array", index + 1))?;
+    match parse_mongosh_value(arg)? {
+        Value::Array(a) => Ok(a),
+        _ => Err(anyhow!("mongo argument {} must be an array", index + 1)),
     }
 }
 
@@ -695,10 +749,81 @@ fn normalize_mongosh_extended(text: &str) -> String {
     s
 }
 
-fn parse_mongosh_value(text: &str) -> Option<Value> {
+fn parse_mongosh_value(text: &str) -> Result<Value> {
+    if let Some(key) = find_unquoted_dotted_key(text) {
+        return Err(anyhow!("mongo argument uses unquoted dotted field `{key}`; write it as \"{key}\""));
+    }
     let normalized = normalize_mongosh_extended(text);
     let trimmed = normalized.trim();
-    serde_json::from_str::<Value>(trimmed).ok()
+    serde_json::from_str::<Value>(trimmed).map_err(|e| anyhow!("parse mongo argument: {e}"))
+}
+
+fn find_unquoted_dotted_key(text: &str) -> Option<String> {
+    let bytes = text.as_bytes();
+    let mut quote = 0u8;
+    let mut escape = false;
+    let mut i = 0usize;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if quote != 0 {
+            if escape {
+                escape = false;
+            } else if b == b'\\' {
+                escape = true;
+            } else if b == quote {
+                quote = 0;
+            }
+            i += 1;
+            continue;
+        }
+        if b == b'\'' || b == b'"' {
+            quote = b;
+            i += 1;
+            continue;
+        }
+        if b == b'{' || b == b',' {
+            let mut j = i + 1;
+            while j < bytes.len() && bytes[j].is_ascii_whitespace() {
+                j += 1;
+            }
+            let start = j;
+            if j >= bytes.len() || !is_mongo_key_start(bytes[j]) {
+                i += 1;
+                continue;
+            }
+            j += 1;
+            let mut saw_dot = false;
+            while j < bytes.len() {
+                if is_mongo_key_continue(bytes[j]) {
+                    j += 1;
+                    continue;
+                }
+                if bytes[j] == b'.' && j + 1 < bytes.len() && is_mongo_key_start(bytes[j + 1]) {
+                    saw_dot = true;
+                    j += 2;
+                    continue;
+                }
+                break;
+            }
+            let end = j;
+            while j < bytes.len() && bytes[j].is_ascii_whitespace() {
+                j += 1;
+            }
+            if saw_dot && j < bytes.len() && bytes[j] == b':' {
+                return Some(text[start..end].to_string());
+            }
+        }
+        i += 1;
+    }
+    None
+}
+
+fn is_mongo_key_start(b: u8) -> bool {
+    b == b'_' || b == b'$' || b.is_ascii_alphabetic()
+}
+
+fn is_mongo_key_continue(b: u8) -> bool {
+    is_mongo_key_start(b) || b.is_ascii_digit()
 }
 
 #[cfg(test)]
@@ -746,6 +871,25 @@ mod tests {
     }
 
     #[test]
+    fn parses_quoted_dotted_field_filter() {
+        let c = parse_mongosh_command(r#"db.users.find({"profile.name": "Ada"})"#).unwrap();
+        let filter = c.filter.unwrap();
+        assert_eq!(filter.get("profile.name"), Some(&Value::from("Ada")));
+    }
+
+    #[test]
+    fn rejects_unquoted_dotted_field_filter() {
+        let err = parse_mongosh_command(r#"db.users.find({profile.name: "Ada"})"#).unwrap_err();
+        assert!(err.to_string().contains("profile.name"), "{err}");
+    }
+
+    #[test]
+    fn rejects_malformed_find_filter_instead_of_empty_filter() {
+        let err = parse_mongosh_command("db.users.find({status: })").unwrap_err();
+        assert!(err.to_string().contains("mongo argument"), "{err}");
+    }
+
+    #[test]
     fn parses_find_one_sets_limit() {
         let c = parse_mongosh_command("db.users.findOne({})").unwrap();
         assert_eq!(c.method, "findOne");
@@ -758,6 +902,23 @@ mod tests {
         assert_eq!(c.method, "updateOne");
         assert!(c.filter.unwrap().contains_key("_id"));
         assert!(c.update.unwrap().contains_key("$set"));
+    }
+
+    #[test]
+    fn rejects_update_missing_update_document() {
+        let err = parse_mongosh_command("db.t.updateOne({_id: 1})").unwrap_err();
+        assert!(err.to_string().contains("argument 2"), "{err}");
+    }
+
+    #[test]
+    fn classify_execute_text_rejects_malformed_mongosh_before_json_request() {
+        let err = classify_execute_text("db.users.find({status: })").unwrap_err();
+        assert!(err.to_string().contains("mongo argument"), "{err}");
+
+        assert!(matches!(
+            classify_execute_text(r#"{"database":"app","collection":"users"}"#).unwrap(),
+            MongoExecuteText::JsonRequest
+        ));
     }
 
     #[test]
@@ -779,5 +940,34 @@ mod tests {
         assert_eq!(a.len(), 2);
         let a = split_mongosh_args("{a: \"x,y\"}");
         assert_eq!(a.len(), 1);
+    }
+
+    #[test]
+    fn objectid_filter_becomes_real_object_id() {
+        // The mongosh path normalizes ObjectId("..") → {"$oid":".."}; the filter
+        // must convert to a real ObjectId, not a `{$oid: ..}` sub-document.
+        let cmd = parse_mongosh_command("db.users.find({_id: ObjectId(\"64b7f0000000000000000001\")})").unwrap();
+        let doc = value_to_doc(&cmd.filter).unwrap();
+        match doc.get("_id") {
+            Some(Bson::ObjectId(oid)) => assert_eq!(oid.to_hex(), "64b7f0000000000000000001"),
+            other => panic!("_id should be a real ObjectId, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn invalid_objectid_filter_errors_not_empty() {
+        // A bad ObjectId must surface as an error, never silently collapse to an
+        // empty filter (which would make find() return the whole collection).
+        let mut filter = Map::new();
+        let mut oid = Map::new();
+        oid.insert("$oid".into(), Value::from("not-a-valid-oid"));
+        filter.insert("_id".into(), Value::Object(oid));
+        assert!(value_to_doc(&Some(filter)).is_err());
+    }
+
+    #[test]
+    fn docs_to_set_marks_empty_document_results() {
+        let set = docs_to_set(&[]);
+        assert!(set.document_result);
     }
 }

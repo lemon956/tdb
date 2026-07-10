@@ -169,6 +169,7 @@ pub enum AsyncMsg {
     QueryResult {
         session_id: u64,
         tab_id: u64,
+        run_id: u64,
         statement: String,
         profile_id: String,
         driver: String,
